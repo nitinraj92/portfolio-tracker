@@ -1,116 +1,121 @@
-const yahooFinance = require('yahoo-finance2').default;
+const { execFile } = require('child_process');
+const path = require('path');
 const db = require('../storage/db');
-const { calcRSI, calcHealth, calcTodayPLFromQuote } = require('./technicals');
+const { calcRSI, calcHealth } = require('./technicals');
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PYTHON = '/tmp/wm_venv/bin/python3';
+const SCRIPT = path.join(__dirname, 'fetch_prices.py');
 
-async function fetchQuote(symbol) {
-  // Try NSE first (.NS), fall back to BSE (.BO) — some stocks are BSE-only
-  for (const suffix of ['.NS', '.BO']) {
-    const ticker = symbol + suffix;
-    try {
-      const q = await yahooFinance.quote(ticker);
-      // Sanity check: regularMarketPrice must be present and > 0
-      if (q && q.regularMarketPrice > 0) return q;
-    } catch (err) {
-      // Try next suffix
-    }
-  }
-  console.warn('[prices/stocks] Could not fetch quote for ' + symbol + ' on NSE or BSE');
-  return null;
+/**
+ * Call the Python yfinance script with a batch of holdings.
+ * Returns a map of symbol → price data.
+ */
+function fetchPricesBatch(holdings) {
+  return new Promise((resolve) => {
+    const input = holdings.map(h => ({
+      symbol: h.symbol,
+      avgCost: h.avgCost || null,
+      exchange: h.exchange || null,
+    }));
+
+    const child = execFile(PYTHON, [SCRIPT], { timeout: 120000 }, (err, stdout, stderr) => {
+      if (err) {
+        console.warn('[prices/stocks] Python fetch error:', err.message);
+        return resolve({});
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (e) {
+        console.warn('[prices/stocks] JSON parse error:', e.message);
+        resolve({});
+      }
+    });
+
+    child.stdin.write(JSON.stringify(input));
+    child.stdin.end();
+  });
 }
 
-async function fetchHistorical(symbol) {
-  const data = db.read();
-  const cached = data.price_history_cache[symbol];
-  const now = Date.now();
-
-  if (cached && cached.fetchedAt && (now - new Date(cached.fetchedAt).getTime()) < CACHE_TTL_MS) {
-    return cached.closes;
-  }
-
-  const ticker = symbol + '.NS';
-  const period1 = new Date(now - 35 * 24 * 60 * 60 * 1000);
-  try {
-    const history = await yahooFinance.historical(ticker, { period1, interval: '1d' });
-    const closes = history.map(h => h.close).filter(c => c != null && !isNaN(c));
-    // Update cache
-    const fresh = db.read();
-    fresh.price_history_cache[symbol] = { closes, fetchedAt: new Date().toISOString() };
-    db.write(fresh);
-    return closes;
-  } catch (err) {
-    console.warn('[prices/stocks] Failed historical for ' + ticker + ': ' + err.message);
-    return cached ? cached.closes : [];
-  }
-}
-
+/**
+ * Refresh live prices for a batch of stock/ETF holdings via Python yfinance.
+ * Uses stored prevClose (from XLSX upload) for today's P&L — more reliable.
+ * Stores which exchange (NSE/BSE) worked for each symbol.
+ */
 async function refreshPrices(holdings) {
-  const results = [];
-  for (const holding of holdings) {
-    const quote = await fetchQuote(holding.symbol);
-    if (!quote) {
-      results.push(holding);
-      continue;
+  if (!holdings || holdings.length === 0) return holdings;
+
+  console.log('[prices/stocks] Fetching', holdings.length, 'symbols via Python yfinance...');
+  const priceMap = await fetchPricesBatch(holdings);
+
+  return holdings.map(holding => {
+    const data = priceMap[holding.symbol];
+    if (!data || !data.price) {
+      console.warn('[prices/stocks] No data for', holding.symbol, '— keeping existing');
+      return holding;
     }
 
-    const ltp = quote.regularMarketPrice || holding.ltp;
-    // Use prevClose from the uploaded XLSX (reliable exchange data) not Yahoo's
-    // regularMarketPreviousClose (can be wrong for some NSE symbols)
-    const prevClose = holding.prevClose || quote.regularMarketPreviousClose || ltp;
+    const ltp = data.price;
+    // Use stored prevClose from XLSX upload (reliable exchange data)
+    const prevClose = holding.prevClose || data.prevClose || ltp;
     const todayPL = Math.round((ltp - prevClose) * holding.qty * 100) / 100;
     const todayPLPct = prevClose > 0 ? Math.round(((ltp - prevClose) / prevClose) * 10000) / 100 : 0;
 
-    const closes = await fetchHistorical(holding.symbol);
-
     let rsi = null;
-    let health = 'Neutral';
+    let health = holding.health || 'Neutral';
     try {
-      if (closes.length >= 15) {
-        rsi = calcRSI(closes);
+      if (data.closes && data.closes.length >= 15) {
+        rsi = calcRSI(data.closes);
         health = calcHealth({
           rsi,
           ltp,
-          dma50: quote.fiftyDayAverage || null,
-          dma200: quote.twoHundredDayAverage || null,
-          plPct: holding.avgCost > 0 ? ((ltp - holding.avgCost) / holding.avgCost) * 100 : 0,
-          pe: quote.trailingPE || null,
+          dma50:  data.dma50,
+          dma200: data.dma200,
+          plPct:  holding.avgCost > 0 ? ((ltp - holding.avgCost) / holding.avgCost) * 100 : 0,
+          pe:     data.pe,
         });
       }
-    } catch (e) {
-      // RSI failed — leave as Neutral
-    }
+    } catch (e) {}
 
-    const updated = {
+    return {
       ...holding,
-      ltp,
+      exchange:    data.exchange,
+      ltp:         Math.round(ltp * 100) / 100,
       prevClose,
       todayPL,
       todayPLPct,
-      plAbsolute: Math.round((ltp - holding.avgCost) * holding.qty * 100) / 100,
-      plPct: holding.avgCost > 0
-        ? Math.round(((ltp - holding.avgCost) / holding.avgCost) * 10000) / 100
-        : 0,
-      dma50: quote.fiftyDayAverage || null,
-      dma200: quote.twoHundredDayAverage || null,
-      week52High: quote.fiftyTwoWeekHigh || null,
-      week52Low: quote.fiftyTwoWeekLow || null,
-      pe: quote.trailingPE || null,
-      debtToEquity: null,       // not available in quote endpoint
-      promoterHolding: null,    // not available in quote endpoint
-      fiiHolding: null,         // not available in quote endpoint
-      marketCap: quote.marketCap || null,
+      plAbsolute:  Math.round((ltp - holding.avgCost) * holding.qty * 100) / 100,
+      plPct:       holding.avgCost > 0 ? Math.round(((ltp - holding.avgCost) / holding.avgCost) * 10000) / 100 : 0,
+      dma50:       data.dma50   || null,
+      dma200:      data.dma200  || null,
+      week52High:  data.week52High || null,
+      week52Low:   data.week52Low  || null,
+      pe:          data.pe         || null,
+      marketCap:   data.marketCap  || null,
       rsi,
-      trend: quote.fiftyDayAverage
-        ? (ltp > quote.fiftyDayAverage ? 'Bullish' : 'Bearish')
-        : null,
+      trend: data.dma50 ? (ltp > data.dma50 ? 'Bullish' : 'Bearish') : null,
       health,
     };
+  });
+}
 
-    results.push(updated);
-    await new Promise(r => setTimeout(r, 300));
-  }
-  return results;
+/**
+ * Fetch a single quote (for /api/technicals/:symbol endpoint).
+ */
+async function fetchQuote(symbol) {
+  const data = db.read();
+  const holding = [...(data.stocks||[]), ...(data.etfs||[])].find(h => h.symbol === symbol) || {};
+  const result = await fetchPricesBatch([{ symbol, avgCost: holding.avgCost, exchange: holding.exchange }]);
+  return result[symbol] || null;
+}
+
+/**
+ * Fetch historical closes for a symbol (used by /api/technicals/:symbol).
+ */
+async function fetchHistorical(symbol) {
+  const data = db.read();
+  const holding = [...(data.stocks||[]), ...(data.etfs||[])].find(h => h.symbol === symbol) || {};
+  const result = await fetchPricesBatch([{ symbol, avgCost: holding.avgCost, exchange: holding.exchange }]);
+  return (result[symbol] && result[symbol].closes) || [];
 }
 
 module.exports = { refreshPrices, fetchQuote, fetchHistorical };
