@@ -125,10 +125,22 @@ function renderDashboard() {
 
   document.getElementById('total-invested').textContent = 'Invested: ' + fmt(summary.totalInvested);
 
+  // Unrealized P&L
   const plEl = document.getElementById('total-pl');
-  plEl.textContent = sign(summary.totalPL) + fmt(summary.totalPL);
-  plEl.className = 'card-value ' + plCls(summary.totalPL);
-  document.getElementById('total-pl-pct').textContent = fmtPct(summary.totalPLPct || 0);
+  const upl = summary.unrealizedPL || 0;
+  plEl.textContent = sign(upl) + fmt(upl);
+  plEl.className = 'card-value ' + plCls(upl);
+  document.getElementById('total-pl-pct').textContent = fmtPct(summary.unrealizedPLPct || 0);
+
+  // Grand Total P&L
+  const gtEl = document.getElementById('grand-total-pl');
+  if (gtEl) {
+    const gpl = summary.grandTotalPL || 0;
+    gtEl.textContent = sign(gpl) + fmt(gpl);
+    gtEl.className = 'card-value ' + plCls(gpl);
+    const gtPct = document.getElementById('grand-total-pl-pct');
+    if (gtPct) gtPct.textContent = fmtPct(summary.grandTotalPct || 0);
+  }
 
   const todayEl = document.getElementById('today-pl');
   todayEl.textContent = sign(summary.totalTodayPL) + fmt(summary.totalTodayPL);
@@ -175,9 +187,18 @@ function renderDashboard() {
     const el = document.getElementById(id);
     if (!el || !seg) return;
     const plPct = seg.invested ? (seg.pl / seg.invested * 100) : 0;
+
+    // Stocks get an extra realized + total line
+    const isStocks = id === 'seg-stocks';
+    const extraLines = isStocks && seg.realizedPL != null
+      ? '<div class="seg-today ' + plCls(seg.realizedPL) + '">Realized: ' + sign(seg.realizedPL) + fmt(seg.realizedPL) + '</div>'
+        + '<div class="seg-xirr ' + plCls(seg.totalPL || 0) + '">Total: ' + sign(seg.totalPL || 0) + fmt(seg.totalPL || 0) + '</div>'
+      : '';
+
     el.innerHTML = '<div class="seg-name">' + sanitize(name) + '</div>'
       + '<div class="seg-pl ' + plCls(seg.pl) + '">' + sign(seg.pl) + fmt(seg.pl) + ' (' + fmtPct(plPct) + ')</div>'
       + '<div class="seg-today ' + plCls(seg.todayPL) + '">Today: ' + sign(seg.todayPL) + fmt(seg.todayPL) + '</div>'
+      + extraLines
       + (seg.xirr != null ? '<div class="seg-xirr">XIRR ' + seg.xirr.toFixed(1) + '%</div>' : '');
   });
 
@@ -436,19 +457,23 @@ function renderMF() {
 }
 
 // ── Data Sources Tab ──────────────────────────────────────────────────────
-const SOURCE_CONFIG = [
-  { id:'zerodha',            title:'Zerodha',              iconLabel:'Z',  iconCls:'zerodha', endpoint:'/api/upload/zerodha',       accept:'.xlsx',       hint:'Console → Reports → Holdings → Export XLSX' },
-  { id:'icici',              title:'ICICI Direct',         iconLabel:'IC', iconCls:'icici',   endpoint:'/api/upload/icici',         accept:'.csv',        hint:'Portfolio → Portfolio Summary → Export' },
-  { id:'mfcentral_nitin',    title:'MFCentral — Nitin',   iconLabel:'MF', iconCls:'nitin',   endpoint:'/api/upload/mfcentral',     accept:'.csv,.xlsx',  hint:'mfcentral.in → CAS → Detailed → Download' },
-  { id:'mfcentral_indumati', title:'MFCentral — Indumati',iconLabel:'MF', iconCls:'indu',    endpoint:'/api/upload/mfcentral',     accept:'.csv,.xlsx',  hint:'mfcentral.in → CAS → Detailed → Download' },
-  { id:'realized_pnl',       title:'Realized P&L',        iconLabel:'P&L',iconCls:'zerodha', endpoint:'/api/upload/realized-pnl', accept:'.xlsx',       hint:'Console → Reports → Tax P&L → Download XLSX · Upload multiple files — they merge automatically' },
+// SOURCE_CONFIG split into two groups for display
+const SOURCE_STOCKS_ETFS = [
+  { id:'zerodha',      title:'Zerodha — Holdings',   iconLabel:'Z',   iconCls:'zerodha', endpoint:'/api/upload/zerodha',       accept:'.xlsx',      hint:'Console → Reports → Holdings → Export XLSX' },
+  { id:'icici',        title:'ICICI Direct',         iconLabel:'IC',  iconCls:'icici',   endpoint:'/api/upload/icici',         accept:'.csv',       hint:'Portfolio → Portfolio Summary → Export' },
+  { id:'realized_pnl', title:'Zerodha — Realized P&L', iconLabel:'P&L', iconCls:'zerodha', endpoint:'/api/upload/realized-pnl', accept:'.xlsx',      hint:'Console → Reports → Tax P&L → Download XLSX · Multiple files merge automatically' },
 ];
+const SOURCE_MF = [
+  { id:'mfcentral_nitin',    title:'MFCentral — Nitin',    iconLabel:'MF', iconCls:'nitin', endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx', hint:'mfcentral.in → CAS → Detailed → Download' },
+  { id:'mfcentral_indumati', title:'MFCentral — Indumati', iconLabel:'MF', iconCls:'indu',  endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx', hint:'mfcentral.in → CAS → Detailed → Download' },
+];
+const SOURCE_CONFIG = [...SOURCE_STOCKS_ETFS, ...SOURCE_MF];
 
 function renderSources() {
   if (!portfolio) return;
   const { lastUpdated = {}, upload_history = [] } = portfolio;
 
-  document.getElementById('source-cards').innerHTML = SOURCE_CONFIG.map(src => {
+  function buildCard(src) {
     const ts    = lastUpdated[src.id];
     const stale = isStale(ts);
     const nextDate = ts ? new Date(ts).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' }) : 'Never';
@@ -475,7 +500,17 @@ function renderSources() {
       + '</div>'
       + '<div id="upload-result-' + src.id + '" style="font-size:11px;margin-top:8px"></div>'
       + '</div>';
-  }).join('');
+  }
+
+  document.getElementById('source-cards').innerHTML =
+    '<div style="margin-bottom:6px"><div class="settings-section-title" style="color:#ff6600;padding:10px 20px 4px;background:white;border-bottom:1px solid var(--border)">Stocks &amp; ETFs</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px 20px">'
+    + SOURCE_STOCKS_ETFS.map(buildCard).join('')
+    + '</div></div>'
+    + '<div><div class="settings-section-title" style="color:var(--purple);padding:10px 20px 4px;background:white;border-bottom:1px solid var(--border)">Mutual Funds</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px 20px">'
+    + SOURCE_MF.map(buildCard).join('')
+    + '</div></div>';
 
   const hist = [...(upload_history||[])].reverse();
   document.getElementById('upload-history').innerHTML = '<h4>Recent Uploads</h4>'
