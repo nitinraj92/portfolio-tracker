@@ -8,6 +8,7 @@ const db = require('./storage/db');
 const parseZerodha = require('./parsers/zerodha');
 const parseICICI = require('./parsers/icici');
 const parseMFCentral = require('./parsers/mfcentral');
+const parseZerodhaPnL = require('./parsers/zerodha_pnl');
 const { refreshPrices, fetchQuote, fetchHistorical } = require('./prices/stocks');
 const { refreshMFPrices, lookupSchemeCode } = require('./prices/mf');
 const { computeSectionXIRR } = require('./prices/xirr');
@@ -37,7 +38,7 @@ function isMarketOpen() {
 }
 
 function calcPortfolioSummary(data) {
-  const { stocks = [], etfs = [], mf_nitin = [], mf_indumati = [], sips = {}, assumptions = {} } = data;
+  const { stocks = [], etfs = [], mf_nitin = [], mf_indumati = [], sips = {}, assumptions = {}, realized_pnl = {} } = data;
 
   const stocksInv   = stocks.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
   const stocksVal   = stocks.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
@@ -96,6 +97,10 @@ function calcPortfolioSummary(data) {
     totalPLPct: totalInvested > 0 ? r((totalPL / totalInvested) * 100) : 0,
     totalTodayPL: r(totalTodayPL),
     monthlySIPs: r(monthlySIPs),
+    realizedPL: r(realized_pnl.totalRealizedPL || 0),
+    realizedWinners: realized_pnl.winners || 0,
+    realizedLosers: realized_pnl.losers || 0,
+    realizedCount: (realized_pnl.entries || []).length,
     segments: {
       stocks:      { invested: r(stocksInv),   value: r(stocksVal),   pl: r(stocksVal - stocksInv),   todayPL: r(stocksToday) },
       etfs:        { invested: r(etfsInv),     value: r(etfsVal),     pl: r(etfsVal - etfsInv),       todayPL: r(etfsToday) },
@@ -229,6 +234,61 @@ app.post('/api/settings', (req, res) => {
   const data = db.read();
   if (req.body.sips) data.sips = req.body.sips;
   if (req.body.assumptions) data.assumptions = req.body.assumptions;
+  db.write(data);
+  res.json({ success: true });
+});
+
+// POST /api/upload/realized-pnl — upload Zerodha Tax P&L XLSX (supports multiple uploads, aggregated)
+app.post('/api/upload/realized-pnl', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  try {
+    const parsed = parseZerodhaPnL(req.file.path);
+    const data = db.read();
+
+    // Merge with existing entries (by symbol) — allows uploading multiple P&L files
+    const existing = data.realized_pnl?.entries || [];
+    const existingMap = {};
+    existing.forEach(e => { existingMap[e.symbol] = e; });
+
+    // Merge: add new entries, update existing ones
+    parsed.entries.forEach(e => {
+      if (existingMap[e.symbol]) {
+        // Add to existing symbol's values
+        existingMap[e.symbol].qty += e.qty;
+        existingMap[e.symbol].buyValue  = Math.round((existingMap[e.symbol].buyValue  + e.buyValue)  * 100) / 100;
+        existingMap[e.symbol].sellValue = Math.round((existingMap[e.symbol].sellValue + e.sellValue) * 100) / 100;
+        existingMap[e.symbol].realizedPL = Math.round((existingMap[e.symbol].realizedPL + e.realizedPL) * 100) / 100;
+      } else {
+        existingMap[e.symbol] = { ...e };
+      }
+    });
+
+    const merged = Object.values(existingMap);
+    const totalRealizedPL  = Math.round(merged.reduce((s, e) => s + e.realizedPL, 0) * 100) / 100;
+    const totalBuyValue    = Math.round(merged.reduce((s, e) => s + e.buyValue, 0) * 100) / 100;
+    const totalSellValue   = Math.round(merged.reduce((s, e) => s + e.sellValue, 0) * 100) / 100;
+    const winners          = merged.filter(e => e.realizedPL > 0).length;
+    const losers           = merged.filter(e => e.realizedPL < 0).length;
+
+    data.realized_pnl = { entries: merged, totalRealizedPL, totalBuyValue, totalSellValue, winners, losers };
+    db.write(data);
+    db.setTimestamp('realized_pnl');
+
+    const diff = { symbols: parsed.entries.length, totalRealizedPL: parsed.totalRealizedPL };
+    db.addUploadHistory({ source: 'realized_pnl', filename: req.file.originalname || req.file.filename, changes: diff });
+    try { require('fs').unlinkSync(req.file.path); } catch {}
+    res.json({ success: true, diff, totalRealizedPL, winners, losers, totalSymbols: merged.length });
+  } catch (err) {
+    try { require('fs').unlinkSync(req.file.path); } catch {}
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/flush/realized-pnl — clear only realized P&L data
+app.post('/api/flush/realized-pnl', (req, res) => {
+  const data = db.read();
+  data.realized_pnl = { entries: [], totalRealizedPL: 0, totalBuyValue: 0, totalSellValue: 0, winners: 0, losers: 0 };
+  data.lastUpdated.realized_pnl = null;
   db.write(data);
   res.json({ success: true });
 });

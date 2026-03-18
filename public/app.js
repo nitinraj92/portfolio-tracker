@@ -45,6 +45,13 @@ async function triggerRefresh() {
   btn.disabled = false;
 }
 
+async function clearRealizedPnL() {
+  if (!confirm('Clear all Realized P&L data? You can re-upload your P&L files again.')) return;
+  await api('POST', '/api/flush/realized-pnl');
+  await loadPortfolio();
+  renderSources();
+}
+
 async function flushData() {
   if (!confirm('This will clear ALL holdings (stocks, ETFs, mutual funds) and upload history.\nSIPs and assumptions will be preserved.\n\nAre you sure?')) return;
   const r = await api('POST', '/api/flush');
@@ -128,6 +135,19 @@ function renderDashboard() {
   todayEl.className = 'card-value ' + plCls(summary.totalTodayPL);
 
   document.getElementById('monthly-sips').textContent = fmt(summary.monthlySIPs);
+
+  const rpEl = document.getElementById('realized-pl');
+  if (rpEl) {
+    const rpl = summary.realizedPL || 0;
+    rpEl.textContent = sign(rpl) + fmt(rpl);
+    rpEl.className = 'card-value ' + plCls(rpl);
+    const rpSub = document.getElementById('realized-pl-sub');
+    if (rpSub && summary.realizedCount > 0) {
+      rpSub.textContent = summary.realizedCount + ' closed · ' + summary.realizedWinners + 'W / ' + summary.realizedLosers + 'L';
+    } else if (rpSub) {
+      rpSub.textContent = 'No data — upload P&L file';
+    }
+  }
 
   const total = summary.totalValue || 1;
   const segs  = summary.segments || {};
@@ -417,10 +437,11 @@ function renderMF() {
 
 // ── Data Sources Tab ──────────────────────────────────────────────────────
 const SOURCE_CONFIG = [
-  { id:'zerodha',            title:'Zerodha',              iconLabel:'Z',  iconCls:'zerodha', endpoint:'/api/upload/zerodha',   accept:'.xlsx',       hint:'Console → Reports → Holdings → Export XLSX' },
-  { id:'icici',              title:'ICICI Direct',         iconLabel:'IC', iconCls:'icici',   endpoint:'/api/upload/icici',     accept:'.csv',        hint:'Portfolio → Portfolio Summary → Export' },
-  { id:'mfcentral_nitin',    title:'MFCentral — Nitin',   iconLabel:'MF', iconCls:'nitin',   endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx',  hint:'mfcentral.in → CAS → Detailed → Download' },
-  { id:'mfcentral_indumati', title:'MFCentral — Indumati',iconLabel:'MF', iconCls:'indu',    endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx',  hint:'mfcentral.in → CAS → Detailed → Download' },
+  { id:'zerodha',            title:'Zerodha',              iconLabel:'Z',  iconCls:'zerodha', endpoint:'/api/upload/zerodha',       accept:'.xlsx',       hint:'Console → Reports → Holdings → Export XLSX' },
+  { id:'icici',              title:'ICICI Direct',         iconLabel:'IC', iconCls:'icici',   endpoint:'/api/upload/icici',         accept:'.csv',        hint:'Portfolio → Portfolio Summary → Export' },
+  { id:'mfcentral_nitin',    title:'MFCentral — Nitin',   iconLabel:'MF', iconCls:'nitin',   endpoint:'/api/upload/mfcentral',     accept:'.csv,.xlsx',  hint:'mfcentral.in → CAS → Detailed → Download' },
+  { id:'mfcentral_indumati', title:'MFCentral — Indumati',iconLabel:'MF', iconCls:'indu',    endpoint:'/api/upload/mfcentral',     accept:'.csv,.xlsx',  hint:'mfcentral.in → CAS → Detailed → Download' },
+  { id:'realized_pnl',       title:'Realized P&L',        iconLabel:'P&L',iconCls:'zerodha', endpoint:'/api/upload/realized-pnl', accept:'.xlsx',       hint:'Console → Reports → Tax P&L → Download XLSX · Upload multiple files — they merge automatically' },
 ];
 
 function renderSources() {

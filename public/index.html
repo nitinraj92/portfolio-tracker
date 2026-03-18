@@ -43,6 +43,12 @@
         <div class="card-value" id="monthly-sips">—</div>
       </div>
       <div class="divider"></div>
+      <div class="summary-card">
+        <div class="card-label">Realized P&amp;L</div>
+        <div class="card-value" id="realized-pl">—</div>
+        <div class="card-sub" id="realized-pl-sub"></div>
+      </div>
+      <div class="divider"></div>
       <div class="allocation-bars" id="allocation-bars"></div>
     </div>
 
@@ -134,6 +140,7 @@
         </div>
         <div class="section-bar-right">
           <a href="/api/export" class="btn-primary" id="btn-export" download>⬇ Download Portfolio</a>
+          <button class="btn-secondary" onclick="clearRealizedPnL()">↺ Clear P&amp;L Data</button>
           <button class="btn-danger" onclick="flushData()">🗑 Flush All Data</button>
         </div>
       </div>
