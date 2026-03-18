@@ -465,7 +465,7 @@ function scheduleRefresh() {
 
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log('Portfolio Tracker running at http://localhost:' + PORT);
     scheduleRefresh();
   });
