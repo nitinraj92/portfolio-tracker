@@ -418,7 +418,7 @@ function renderMF() {
 // ── Data Sources Tab ──────────────────────────────────────────────────────
 const SOURCE_CONFIG = [
   { id:'zerodha',            title:'Zerodha',              iconLabel:'Z',  iconCls:'zerodha', endpoint:'/api/upload/zerodha',   accept:'.xlsx',       hint:'Console → Reports → Holdings → Export XLSX' },
-  { id:'icici',              title:'ICICI Direct',         iconLabel:'IC', iconCls:'icici',   endpoint:'/api/upload/icici',     accept:'.csv',        hint:'Portfolio → Holdings → Export CSV' },
+  { id:'icici',              title:'ICICI Direct',         iconLabel:'IC', iconCls:'icici',   endpoint:'/api/upload/icici',     accept:'.csv',        hint:'Portfolio → Portfolio Summary → Export' },
   { id:'mfcentral_nitin',    title:'MFCentral — Nitin',   iconLabel:'MF', iconCls:'nitin',   endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx',  hint:'mfcentral.in → CAS → Detailed → Download' },
   { id:'mfcentral_indumati', title:'MFCentral — Indumati',iconLabel:'MF', iconCls:'indu',    endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx',  hint:'mfcentral.in → CAS → Detailed → Download' },
 ];
@@ -646,22 +646,45 @@ function renderSettings() {
     + '<span>Total: <strong>' + fmt(nitinTotal+induTotal) + '/mo</strong></span>'
     + '</div>';
 
+  // Unified ETF SIP table — all brokers, normalized with date + mode (qty/amount)
+  const dateOpts2 = [1,2,3,4,5,7,10,11,15,25];
+  function etfDateSel(selected, type, idx) {
+    return '<select class="settings-select" data-type="' + type + '" data-field="date" data-idx="' + idx + '">'
+      + dateOpts2.map(d => '<option value="' + d + '"' + (d===selected?' selected':'') + '>' + d + (d===1?'st':d===2?'nd':d===3?'rd':'th') + '</option>').join('')
+      + '</select>';
+  }
+  function modeSel(mode, type, idx) {
+    return '<select class="settings-select" data-type="' + type + '" data-field="mode" data-idx="' + idx + '" onchange="renderSettings()">'
+      + '<option value="qty"' + (mode==='qty'?' selected':'') + '>Units</option>'
+      + '<option value="amount"' + (mode==='amount'?' selected':'') + '>₹ Amount</option>'
+      + '</select>';
+  }
+
+  function etfRows(list, type, broker) {
+    return list.map((s,i) => {
+      const m = s.mode || (type==='etf_zerodha' ? 'qty' : 'amount');
+      const valField = m === 'qty'
+        ? '<input class="settings-input" style="width:65px" data-type="' + type + '" data-field="qty" data-idx="' + i + '" type="number" value="' + (s.qty||0) + '"> units'
+        : '<input class="settings-input" style="width:75px" data-type="' + type + '" data-field="amount" data-idx="' + i + '" type="number" value="' + (s.amount||0) + '"> ₹';
+      return '<tr>'
+        + '<td class="font-bold">' + sanitize(s.symbol||'') + '</td>'
+        + '<td><span style="font-size:10px;color:#64748b">' + sanitize(broker) + '</span></td>'
+        + '<td>' + valField + '</td>'
+        + '<td>' + modeSel(m, type, i) + '</td>'
+        + '<td>' + etfDateSel(s.date||2, type, i) + '</td>'
+        + '<td><span class="' + (s.status==='active'?'status-active':'status-paused') + '">' + sanitize(s.status||'') + '</span></td>'
+        + '</tr>';
+    }).join('');
+  }
+
   document.getElementById('settings-etf-sips').innerHTML =
-    '<div style="display:flex;gap:16px;flex-wrap:wrap">'
-    + '<div style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:14px">'
-    + '<div class="settings-section-title" style="color:#ff6600;margin-bottom:10px">Zerodha Basket — 2nd of month</div>'
-    + '<table class="settings-table"><thead><tr><th>ETF</th><th>Units/month</th><th>Status</th></tr></thead><tbody>'
-    + etfZ.map((s,i) => '<tr><td class="font-bold">' + sanitize(s.symbol||'') + '</td>'
-        + '<td><input class="settings-input" style="width:60px" data-type="etf_zerodha" data-field="qty" data-idx="' + i + '" type="number" value="' + (s.qty||0) + '"></td>'
-        + '<td><span class="' + (s.status==='active'?'status-active':'status-paused') + '">' + sanitize(s.status||'') + '</span></td></tr>').join('')
-    + '</tbody></table></div>'
-    + '<div style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:14px">'
-    + '<div class="settings-section-title" style="color:#f97316;margin-bottom:10px">ICICI (Groww) — 2nd of month</div>'
-    + '<table class="settings-table"><thead><tr><th>ETF</th><th>Amount (₹/month)</th><th>Status</th></tr></thead><tbody>'
-    + etfI.map((s,i) => '<tr><td class="font-bold">' + sanitize(s.symbol||'') + '</td>'
-        + '<td><input class="settings-input" data-type="etf_icici" data-field="amount" data-idx="' + i + '" type="number" value="' + (s.amount||0) + '"></td>'
-        + '<td><span class="' + (s.status==='active'?'status-active':'status-paused') + '">' + sanitize(s.status||'') + '</span></td></tr>').join('')
-    + '</tbody></table></div></div>';
+    '<table class="settings-table"><thead><tr>'
+    + '<th>ETF</th><th>Broker</th><th>Value / Month</th><th>Mode</th><th>SIP Date</th><th>Status</th>'
+    + '</tr></thead><tbody>'
+    + etfRows(etfZ, 'etf_zerodha', 'Zerodha')
+    + etfRows(etfI, 'etf_icici', 'ICICI')
+    + '</tbody></table>'
+    + '<div class="assump-note" style="margin-top:8px">Mode: "Units" = buy N units/month (Zerodha basket). "₹ Amount" = invest fixed amount/month (ICICI).</div>';
 
   const { mfEtfCagr=12, stocksCagr=15, monthlyStockBudget=4000 } = assumptions;
   document.getElementById('settings-assumptions').innerHTML =
@@ -689,7 +712,13 @@ async function saveSettings() {
     document.querySelectorAll('[data-type="' + type + '"]').forEach(el => {
       const idx = parseInt(el.dataset.idx), field = el.dataset.field;
       if (isNaN(idx) || !settings.sips[type][idx]) return;
-      settings.sips[type][idx][field] = parseFloat(el.value);
+      if (field === 'mode') {
+        settings.sips[type][idx][field] = el.value;
+      } else if (field === 'date') {
+        settings.sips[type][idx][field] = parseInt(el.value);
+      } else {
+        settings.sips[type][idx][field] = parseFloat(el.value);
+      }
     });
   });
   const mfCagr = document.getElementById('set-mf-cagr');

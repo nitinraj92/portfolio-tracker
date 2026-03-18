@@ -67,9 +67,24 @@ function calcPortfolioSummary(data) {
   const induXIRR  = computeSectionXIRR(induSIPs, mfInduVal);
 
   // Monthly SIPs total
-  const mfSIPs  = (sips.mf || []).filter(s => s.status === 'active').reduce((a, s) => a + s.amount, 0);
-  const etfZSIPs = (sips.etf_zerodha || []).filter(s => s.status === 'active').reduce((a, s) => a + s.qty * 220, 0);
-  const etfISIPs = (sips.etf_icici || []).filter(s => s.status === 'active').reduce((a, s) => a + s.amount, 0);
+  const mfSIPs = (sips.mf || []).filter(s => s.status === 'active').reduce((a, s) => a + s.amount, 0);
+
+  // ETF Zerodha: qty × actual LTP from holdings (or stored amount if available)
+  const etfPriceMap = {};
+  etfs.forEach(e => { etfPriceMap[e.symbol] = e.ltp || e.avgCost || 0; });
+  const etfZSIPs = (sips.etf_zerodha || []).filter(s => s.status === 'active').reduce((a, s) => {
+    if (s.amount) return a + s.amount; // use stored amount if set
+    const price = etfPriceMap[s.symbol] || 0;
+    return a + (s.qty || 0) * price;
+  }, 0);
+
+  // ETF ICICI: use amount directly (or qty × price if amount missing)
+  const etfISIPs = (sips.etf_icici || []).filter(s => s.status === 'active').reduce((a, s) => {
+    if (s.amount) return a + s.amount;
+    const price = etfPriceMap[s.symbol] || 0;
+    return a + (s.qty || 0) * price;
+  }, 0);
+
   const monthlySIPs = mfSIPs + etfZSIPs + etfISIPs + (assumptions.monthlyStockBudget || 0);
 
   const r = n => Math.round(n * 100) / 100;

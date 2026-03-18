@@ -5,24 +5,19 @@ const { calcRSI, calcHealth, calcTodayPLFromQuote } = require('./technicals');
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 async function fetchQuote(symbol) {
-  const ticker = symbol + '.NS';
-  try {
-    const q = await yahooFinance.quote(ticker, {
-      fields: [
-        'regularMarketPrice', 'regularMarketPreviousClose',
-        'fiftyDayAverage', 'twoHundredDayAverage',
-        'fiftyTwoWeekHigh', 'fiftyTwoWeekLow',
-        'trailingPE', 'marketCap',
-        'sharesOutstanding', 'bookValue'
-      ]
-      // Note: debtToEquity, heldPercentInsiders, heldPercentInstitutions are not
-      // available as QuoteFields in yahoo-finance2@2.11.3 — excluded.
-    });
-    return q;
-  } catch (err) {
-    console.warn('[prices/stocks] Failed to fetch ' + ticker + ': ' + err.message);
-    return null;
+  // Try NSE first (.NS), fall back to BSE (.BO) — some stocks are BSE-only
+  for (const suffix of ['.NS', '.BO']) {
+    const ticker = symbol + suffix;
+    try {
+      const q = await yahooFinance.quote(ticker);
+      // Sanity check: regularMarketPrice must be present and > 0
+      if (q && q.regularMarketPrice > 0) return q;
+    } catch (err) {
+      // Try next suffix
+    }
   }
+  console.warn('[prices/stocks] Could not fetch quote for ' + symbol + ' on NSE or BSE');
+  return null;
 }
 
 async function fetchHistorical(symbol) {
@@ -59,7 +54,13 @@ async function refreshPrices(holdings) {
       continue;
     }
 
-    const todayFields = calcTodayPLFromQuote(quote, holding.qty);
+    const ltp = quote.regularMarketPrice || holding.ltp;
+    // Use prevClose from the uploaded XLSX (reliable exchange data) not Yahoo's
+    // regularMarketPreviousClose (can be wrong for some NSE symbols)
+    const prevClose = holding.prevClose || quote.regularMarketPreviousClose || ltp;
+    const todayPL = Math.round((ltp - prevClose) * holding.qty * 100) / 100;
+    const todayPLPct = prevClose > 0 ? Math.round(((ltp - prevClose) / prevClose) * 10000) / 100 : 0;
+
     const closes = await fetchHistorical(holding.symbol);
 
     let rsi = null;
@@ -69,10 +70,10 @@ async function refreshPrices(holdings) {
         rsi = calcRSI(closes);
         health = calcHealth({
           rsi,
-          ltp: todayFields.ltp,
+          ltp,
           dma50: quote.fiftyDayAverage || null,
           dma200: quote.twoHundredDayAverage || null,
-          plPct: holding.plPct || 0,
+          plPct: holding.avgCost > 0 ? ((ltp - holding.avgCost) / holding.avgCost) * 100 : 0,
           pe: quote.trailingPE || null,
         });
       }
@@ -80,13 +81,12 @@ async function refreshPrices(holdings) {
       // RSI failed — leave as Neutral
     }
 
-    const ltp = todayFields.ltp;
     const updated = {
       ...holding,
       ltp,
-      prevClose: todayFields.prevClose,
-      todayPL: todayFields.todayPL,
-      todayPLPct: todayFields.todayPLPct,
+      prevClose,
+      todayPL,
+      todayPLPct,
       plAbsolute: Math.round((ltp - holding.avgCost) * holding.qty * 100) / 100,
       plPct: holding.avgCost > 0
         ? Math.round(((ltp - holding.avgCost) / holding.avgCost) * 10000) / 100
