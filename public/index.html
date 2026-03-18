@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- FIXED HEADER -->
+  <header id="header">
+    <div class="header-top">
+      <div class="app-title">📊 Portfolio Tracker</div>
+      <div class="header-right">
+        <span id="market-status" class="market-badge"></span>
+        <span id="refresh-countdown" class="refresh-info"></span>
+        <button id="btn-refresh" class="btn-primary" onclick="triggerRefresh()">⟳ Refresh Now</button>
+      </div>
+    </div>
+
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="card-label">Total Portfolio</div>
+        <div class="card-value" id="total-value">—</div>
+        <div class="card-sub" id="total-invested">Invested: —</div>
+      </div>
+      <div class="divider"></div>
+      <div class="summary-card">
+        <div class="card-label">Overall P&amp;L</div>
+        <div class="card-value" id="total-pl">—</div>
+        <div class="card-sub" id="total-pl-pct"></div>
+      </div>
+      <div class="divider"></div>
+      <div class="summary-card">
+        <div class="card-label">Today's P&amp;L</div>
+        <div class="card-value" id="today-pl">—</div>
+      </div>
+      <div class="divider"></div>
+      <div class="summary-card">
+        <div class="card-label">Monthly SIPs</div>
+        <div class="card-value" id="monthly-sips">—</div>
+      </div>
+      <div class="divider"></div>
+      <div class="allocation-bars" id="allocation-bars"></div>
+    </div>
+
+    <div class="segment-strip">
+      <div class="segment-item" id="seg-stocks"></div>
+      <div class="segment-item" id="seg-etfs"></div>
+      <div class="segment-item" id="seg-mf-nitin"></div>
+      <div class="segment-item" id="seg-mf-indu"></div>
+    </div>
+
+    <nav class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('stocks')">📈 Stocks</button>
+      <button class="tab-btn" onclick="switchTab('etfs')">📊 ETFs</button>
+      <button class="tab-btn" onclick="switchTab('mf')">🏦 Mutual Funds</button>
+      <button class="tab-btn" onclick="switchTab('sources')">📂 Data Sources</button>
+      <button class="tab-btn" onclick="switchTab('wealth')">📈 Wealth Projection</button>
+      <button class="tab-btn" onclick="switchTab('settings')">⚙️ Settings</button>
+    </nav>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main id="main">
+
+    <!-- Tab: Stocks -->
+    <div id="tab-stocks" class="tab-panel active">
+      <div class="section-bar">
+        <div class="section-bar-left">
+          <span class="section-title">📈 Stocks</span>
+          <span class="last-updated-badge" id="lu-zerodha"></span>
+        </div>
+        <div class="section-bar-right">
+          <span class="sort-label">Sort:</span>
+          <select id="stocks-sort" onchange="renderStocks()">
+            <option value="plPct">P&amp;L %</option>
+            <option value="todayPLPct">Today %</option>
+            <option value="value">Value</option>
+            <option value="symbol">Name</option>
+          </select>
+          <input id="stocks-filter" class="filter-input" placeholder="🔍 Filter..." oninput="renderStocks()">
+        </div>
+      </div>
+      <div class="summary-strip" id="stocks-summary"></div>
+      <div class="table-wrap">
+        <table class="data-table" id="stocks-table">
+          <thead>
+            <tr>
+              <th>STOCK</th><th>QTY</th><th>AVG</th>
+              <th>LTP <span class="live-dot">●</span></th>
+              <th>VALUE</th><th>P&amp;L</th><th>TODAY</th>
+              <th>HEALTH</th><th>52W</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="stocks-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab: ETFs -->
+    <div id="tab-etfs" class="tab-panel">
+      <div class="section-bar">
+        <div class="section-bar-left">
+          <span class="section-title">📊 ETFs</span>
+          <span class="last-updated-badge" id="lu-zerodha-etf"></span>
+          <span class="last-updated-badge" id="lu-icici"></span>
+        </div>
+      </div>
+      <div class="summary-strip" id="etfs-summary"></div>
+      <div id="etfs-content"></div>
+    </div>
+
+    <!-- Tab: Mutual Funds -->
+    <div id="tab-mf" class="tab-panel">
+      <div class="section-bar">
+        <div class="section-bar-left">
+          <span class="section-title">🏦 Mutual Funds</span>
+          <span class="last-updated-badge" id="lu-mf-nitin"></span>
+          <span class="last-updated-badge" id="lu-mf-indu"></span>
+        </div>
+      </div>
+      <div class="summary-strip" id="mf-summary"></div>
+      <div id="mf-content"></div>
+    </div>
+
+    <!-- Tab: Data Sources -->
+    <div id="tab-sources" class="tab-panel">
+      <div class="section-bar">
+        <div class="section-bar-left">
+          <span class="section-title">📂 Data Sources</span>
+        </div>
+        <div class="section-bar-right">
+          <a href="/api/export" class="btn-primary" id="btn-export" download>⬇ Download Portfolio</a>
+          <button class="btn-danger" onclick="flushData()">🗑 Flush All Data</button>
+        </div>
+      </div>
+      <div class="source-cards" id="source-cards"></div>
+      <div class="upload-history-wrap" id="upload-history"></div>
+    </div>
+
+    <!-- Tab: Wealth Projection -->
+    <div id="tab-wealth" class="tab-panel">
+      <div class="section-bar">
+        <div class="section-bar-left"><span class="section-title">📈 Wealth Projection</span></div>
+      </div>
+      <div class="assumptions-bar" id="assumptions-bar"></div>
+      <div class="milestone-cards" id="milestone-cards"></div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <span>Portfolio Growth Curve</span>
+          <div class="chart-legend">
+            <span><span class="legend-dot purple"></span> Total Wealth</span>
+            <span><span class="legend-dot grey"></span> Capital Deployed</span>
+          </div>
+        </div>
+        <canvas id="wealth-chart" height="80"></canvas>
+      </div>
+      <div class="year-table-card" id="year-table"></div>
+    </div>
+
+    <!-- Tab: Settings -->
+    <div id="tab-settings" class="tab-panel">
+      <div class="section-bar">
+        <div class="section-bar-left"><span class="section-title">⚙️ Settings</span></div>
+      </div>
+      <div class="settings-tabs">
+        <button class="stab active" onclick="switchSettingsTab('mf-sips')">💰 MF SIPs</button>
+        <button class="stab" onclick="switchSettingsTab('etf-sips')">📊 ETF SIPs</button>
+        <button class="stab" onclick="switchSettingsTab('assumptions')">📈 Projection Assumptions</button>
+      </div>
+      <div id="settings-mf-sips" class="settings-panel active"></div>
+      <div id="settings-etf-sips" class="settings-panel"></div>
+      <div id="settings-assumptions" class="settings-panel"></div>
+      <div class="settings-footer">
+        <button class="btn-secondary" onclick="loadSettings()">Cancel</button>
+        <button class="btn-primary" onclick="saveSettings()">Save Changes</button>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
