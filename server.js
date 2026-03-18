@@ -218,6 +218,122 @@ app.post('/api/settings', (req, res) => {
   res.json({ success: true });
 });
 
+// GET /api/export — download portfolio as Excel (.xlsx) with 3 sheets
+app.get('/api/export', (req, res) => {
+  const XLSX = require('xlsx');
+  const data = db.read();
+
+  const r = n => Math.round((n || 0) * 100) / 100;
+
+  // Sheet 1: Stocks
+  const stockRows = data.stocks.map(h => ({
+    Symbol: h.symbol,
+    Sector: h.sector || '',
+    Qty: h.qty,
+    'Avg Cost': r(h.avgCost),
+    LTP: r(h.ltp),
+    'Invested (₹)': r(h.avgCost * h.qty),
+    'Value (₹)': r(h.ltp * h.qty),
+    'P&L (₹)': r(h.plAbsolute),
+    'P&L %': r(h.plPct),
+    "Today P&L (₹)": r(h.todayPL),
+    RSI: h.rsi || '',
+    Health: h.health || '',
+  }));
+  const stocksInv = data.stocks.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
+  const stocksVal = data.stocks.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
+  stockRows.push({
+    Symbol: 'TOTAL', Sector: '', Qty: '', 'Avg Cost': '',
+    LTP: '', 'Invested (₹)': r(stocksInv), 'Value (₹)': r(stocksVal),
+    'P&L (₹)': r(stocksVal - stocksInv),
+    'P&L %': stocksInv > 0 ? r((stocksVal - stocksInv) / stocksInv * 100) : 0,
+    "Today P&L (₹)": r(data.stocks.reduce((s, h) => s + (h.todayPL || 0), 0)),
+    RSI: '', Health: '',
+  });
+
+  // Sheet 2: ETFs
+  const etfRows = data.etfs.map(h => ({
+    Symbol: h.symbol,
+    Category: h.category || '',
+    Qty: h.qty,
+    'Avg Cost': r(h.avgCost),
+    'NAV/LTP': r(h.ltp),
+    'Invested (₹)': r((h.avgCost || 0) * h.qty),
+    'Value (₹)': r((h.ltp || 0) * h.qty),
+    'P&L (₹)': r(h.plAbsolute),
+    'P&L %': r(h.plPct),
+    "Today P&L (₹)": r(h.todayPL),
+    Source: h.source || '',
+  }));
+  const etfsInv = data.etfs.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
+  const etfsVal = data.etfs.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
+  etfRows.push({
+    Symbol: 'TOTAL', Category: '', Qty: '', 'Avg Cost': '',
+    'NAV/LTP': '', 'Invested (₹)': r(etfsInv), 'Value (₹)': r(etfsVal),
+    'P&L (₹)': r(etfsVal - etfsInv),
+    'P&L %': etfsInv > 0 ? r((etfsVal - etfsInv) / etfsInv * 100) : 0,
+    "Today P&L (₹)": r(data.etfs.reduce((s, h) => s + (h.todayPL || 0), 0)),
+    Source: '',
+  });
+
+  // Sheet 3: Mutual Funds (combined)
+  const allMF = [
+    ...data.mf_nitin.map(h => ({ ...h, holder: 'Nitin' })),
+    ...data.mf_indumati.map(h => ({ ...h, holder: 'Indumati' })),
+  ];
+  const mfRows = allMF.map(h => {
+    const val = h.currentValue || (h.nav || 0) * h.units;
+    return {
+      Holder: h.holder,
+      Scheme: h.scheme,
+      Plan: h.plan || '',
+      Units: h.units,
+      'NAV': r(h.nav),
+      'Invested (₹)': r(h.invested),
+      'Value (₹)': r(val),
+      'P&L (₹)': r(h.plAbsolute),
+      'P&L %': r(h.plPct),
+      "Today P&L (₹)": r(h.todayPL),
+    };
+  });
+  const mfInv = allMF.reduce((s, h) => s + (h.invested || 0), 0);
+  const mfVal = allMF.reduce((s, h) => s + (h.currentValue || (h.nav || 0) * h.units || 0), 0);
+  mfRows.push({
+    Holder: 'TOTAL', Scheme: '', Plan: '', Units: '',
+    NAV: '', 'Invested (₹)': r(mfInv), 'Value (₹)': r(mfVal),
+    'P&L (₹)': r(mfVal - mfInv),
+    'P&L %': mfInv > 0 ? r((mfVal - mfInv) / mfInv * 100) : 0,
+    "Today P&L (₹)": r(allMF.reduce((s, h) => s + (h.todayPL || 0), 0)),
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stockRows), 'Stocks');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(etfRows), 'ETFs');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mfRows), 'Mutual Funds');
+
+  const date = new Date().toISOString().slice(0, 10);
+  const filename = 'portfolio-' + date + '.xlsx';
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
+});
+
+// POST /api/flush — clear all holdings, keep SIPs/assumptions/scheme codes
+app.post('/api/flush', (req, res) => {
+  const data = db.read();
+  data.stocks = [];
+  data.etfs = [];
+  data.mf_nitin = [];
+  data.mf_indumati = [];
+  data.price_history_cache = {};
+  data.upload_history = [];
+  data.lastUpdated = { zerodha: null, icici: null, mfcentral_nitin: null, mfcentral_indumati: null, prices: null };
+  // Keep: sips, assumptions, mf_scheme_codes
+  db.write(data);
+  res.json({ success: true, message: 'All holdings cleared. SIPs and assumptions preserved.' });
+});
+
 // ─── Auto-refresh ─────────────────────────────────────────────────────
 
 let refreshTimer = null;
