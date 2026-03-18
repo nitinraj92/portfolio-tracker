@@ -11,7 +11,7 @@ const parseMFCentral = require('./parsers/mfcentral');
 const parseZerodhaPnL = require('./parsers/zerodha_pnl');
 const { refreshPrices, fetchQuote, fetchHistorical } = require('./prices/stocks');
 const { refreshMFPrices, lookupSchemeCode } = require('./prices/mf');
-const { computeSectionXIRR } = require('./prices/xirr');
+const { computeSectionXIRR, computeCombinedXIRR } = require('./prices/xirr');
 const { calcRSI, calcHealth } = require('./prices/technicals');
 
 const ETF_CATEGORIES = {
@@ -62,11 +62,17 @@ function calcPortfolioSummary(data) {
   const totalPL       = totalValue - totalInvested;
   const totalTodayPL  = stocksToday + etfsToday + mfNitinToday + mfInduToday;
 
-  // XIRR per MF section
+  // XIRR per MF section — pass actual invested from CAS as ground truth
   const nitinSIPs = (sips.mf || []).filter(s => s.holder === 'nitin' && s.status === 'active');
   const induSIPs  = (sips.mf || []).filter(s => s.holder === 'indumati' && s.status === 'active');
-  const nitinXIRR = computeSectionXIRR(nitinSIPs, mfNitinVal);
-  const induXIRR  = computeSectionXIRR(induSIPs, mfInduVal);
+  const nitinXIRR = computeSectionXIRR(nitinSIPs, mfNitinVal, mfNitinInv);
+  const induXIRR  = computeSectionXIRR(induSIPs,  mfInduVal,  mfInduInv);
+
+  // Combined XIRR across all MFs
+  const combinedMFXIRR = computeCombinedXIRR([
+    { sips: nitinSIPs, currentValue: mfNitinVal, actualInvested: mfNitinInv },
+    { sips: induSIPs,  currentValue: mfInduVal,  actualInvested: mfInduInv  },
+  ]);
 
   // Monthly SIPs total
   const mfSIPs = (sips.mf || []).filter(s => s.status === 'active').reduce((a, s) => a + s.amount, 0);
@@ -121,6 +127,13 @@ function calcPortfolioSummary(data) {
       etfs:        { invested: r(etfsInv),    value: r(etfsVal),    pl: r(etfsVal - etfsInv),       todayPL: r(etfsToday) },
       mf_nitin:    { invested: r(mfNitinInv), value: r(mfNitinVal), pl: r(mfNitinVal - mfNitinInv), todayPL: r(mfNitinToday), xirr: nitinXIRR },
       mf_indumati: { invested: r(mfInduInv),  value: r(mfInduVal),  pl: r(mfInduVal - mfInduInv),   todayPL: r(mfInduToday),  xirr: induXIRR },
+      mf_combined: {
+        invested: r(mfNitinInv + mfInduInv),
+        value:    r(mfNitinVal + mfInduVal),
+        pl:       r((mfNitinVal + mfInduVal) - (mfNitinInv + mfInduInv)),
+        todayPL:  r(mfNitinToday + mfInduToday),
+        xirr:     combinedMFXIRR,
+      },
     },
   };
 }

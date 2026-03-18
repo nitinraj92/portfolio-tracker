@@ -396,12 +396,14 @@ function renderMF() {
   const totalToday= nitinToday + induToday;
   const mfSIPTotal= (sips.mf||[]).filter(s=>s.status==='active').reduce((a,s)=>a+s.amount,0);
 
+  const combinedXIRR = summary?.segments?.mf_combined?.xirr;
   document.getElementById('mf-summary').innerHTML =
     '<span>Invested: <strong>' + fmt(totalInv) + '</strong></span>' +
     '<span>Value: <strong>' + fmt(totalVal) + '</strong></span>' +
     '<span class="' + plCls(totalPL) + '">P&amp;L: <strong>' + sign(totalPL) + fmt(totalPL) + ' (' + fmtPct(totalInv?totalPL/totalInv*100:0) + ')</strong></span>' +
     '<span class="' + plCls(totalToday) + '">Today: <strong>' + sign(totalToday) + fmt(totalToday) + '</strong></span>' +
-    '<span>MF SIPs: <strong>' + fmt(mfSIPTotal) + '/mo</strong></span>';
+    '<span>MF SIPs: <strong>' + fmt(mfSIPTotal) + '/mo</strong></span>' +
+    (combinedXIRR != null ? '<span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:8px;font-size:11px">Combined XIRR <strong>' + combinedXIRR.toFixed(1) + '%</strong></span>' : '');
 
   const sipMap = {};
   (sips.mf||[]).forEach(s => { sipMap[s.scheme] = s; });
