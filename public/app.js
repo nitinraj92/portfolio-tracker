@@ -609,7 +609,7 @@ function renderSettings() {
   const etfZ   = sips.etf_zerodha || [];
   const etfI   = sips.etf_icici || [];
 
-  const dateOptions = [1,2,3,4,5,7,10,11,15,25];
+  const dateOptions = Array.from({length:31},(_,i)=>i+1);
   function dateSelect(selected, idx) {
     return '<select class="settings-select" data-type="mf" data-field="date" data-idx="' + idx + '">'
       + dateOptions.map(d => '<option value="' + d + '"' + (d===selected?' selected':'') + '>' + d + (d===1?'st':d===2?'nd':d===3?'rd':'th') + '</option>').join('')
@@ -647,7 +647,7 @@ function renderSettings() {
     + '</div>';
 
   // Unified ETF SIP table — all brokers, normalized with date + mode (qty/amount)
-  const dateOpts2 = [1,2,3,4,5,7,10,11,15,25];
+  const dateOpts2 = Array.from({length:31},(_,i)=>i+1);
   function etfDateSel(selected, type, idx) {
     return '<select class="settings-select" data-type="' + type + '" data-field="date" data-idx="' + idx + '">'
       + dateOpts2.map(d => '<option value="' + d + '"' + (d===selected?' selected':'') + '>' + d + (d===1?'st':d===2?'nd':d===3?'rd':'th') + '</option>').join('')
