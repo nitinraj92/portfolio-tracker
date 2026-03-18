@@ -56,8 +56,15 @@ function computeSectionXIRR(sips, currentValue, actualInvested) {
         return sum + s.amount * m;
       }, 0);
 
-  // Spread total invested evenly as monthly flows from startDate to today
-  const monthlyAmount = totalInvested / months;
+  // Count exact number of monthly payments (same logic as generateCashFlows loop)
+  // so that monthlyAmount × count = totalInvested exactly
+  let count = 0;
+  const counter = new Date(startDate);
+  const now2 = new Date();
+  while (counter <= now2) { count++; counter.setMonth(counter.getMonth() + 1); }
+  if (count === 0) return 0;
+
+  const monthlyAmount = totalInvested / count;
   const flows = generateCashFlows(monthlyAmount, startDate);
   if (flows.length === 0) return 0;
 
@@ -103,7 +110,12 @@ function computeCombinedXIRR(sections) {
           return sum + s.amount * m;
         }, 0);
 
-    const monthlyAmount = totalInv / months;
+    let cnt = 0;
+    const ctr = new Date(startDate);
+    const n2 = new Date();
+    while (ctr <= n2) { cnt++; ctr.setMonth(ctr.getMonth() + 1); }
+    if (cnt === 0) continue;
+    const monthlyAmount = totalInv / cnt;
     allFlows.push(...generateCashFlows(monthlyAmount, startDate));
     totalCurrentValue += currentValue;
   }

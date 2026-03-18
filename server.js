@@ -102,8 +102,11 @@ function calcPortfolioSummary(data) {
   const grandTotalPL  = r(unrealizedPL + realizedPL);
   const grandTotalPct = totalInvested > 0 ? r((grandTotalPL / totalInvested) * 100) : 0;
 
+  // "Net Invested" = total deployed minus what's been returned via realized gains
+  const netInvested = r(totalInvested - realizedPLAmt);
+
   return {
-    totalInvested: r(totalInvested),
+    totalInvested: netInvested,
     totalValue: r(totalValue),
     unrealizedPL,
     unrealizedPLPct: totalInvested > 0 ? r((unrealizedPL / totalInvested) * 100) : 0,
