@@ -12,10 +12,11 @@ async function fetchQuote(symbol) {
         'regularMarketPrice', 'regularMarketPreviousClose',
         'fiftyDayAverage', 'twoHundredDayAverage',
         'fiftyTwoWeekHigh', 'fiftyTwoWeekLow',
-        'trailingPE', 'debtToEquity',
-        'heldPercentInsiders', 'heldPercentInstitutions',
-        'marketCap'
+        'trailingPE', 'marketCap',
+        'sharesOutstanding', 'bookValue'
       ]
+      // Note: debtToEquity, heldPercentInsiders, heldPercentInstitutions are not
+      // available as QuoteFields in yahoo-finance2@2.11.3 — excluded.
     });
     return q;
   } catch (err) {
@@ -95,13 +96,9 @@ async function refreshPrices(holdings) {
       week52High: quote.fiftyTwoWeekHigh || null,
       week52Low: quote.fiftyTwoWeekLow || null,
       pe: quote.trailingPE || null,
-      debtToEquity: quote.debtToEquity || null,
-      promoterHolding: quote.heldPercentInsiders != null
-        ? Math.round(quote.heldPercentInsiders * 10000) / 100
-        : null,
-      fiiHolding: quote.heldPercentInstitutions != null
-        ? Math.round(quote.heldPercentInstitutions * 10000) / 100
-        : null,
+      debtToEquity: null,       // not available in quote endpoint
+      promoterHolding: null,    // not available in quote endpoint
+      fiiHolding: null,         // not available in quote endpoint
       marketCap: quote.marketCap || null,
       rsi,
       trend: quote.fiftyDayAverage
