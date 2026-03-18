@@ -1,0 +1,53 @@
+{
+  "lastUpdated": {
+    "zerodha": null,
+    "icici": null,
+    "mfcentral_nitin": null,
+    "mfcentral_indumati": null,
+    "prices": null
+  },
+  "stocks": [],
+  "etfs": [],
+  "mf_nitin": [],
+  "mf_indumati": [],
+  "mf_scheme_codes": {},
+  "price_history_cache": {},
+  "upload_history": [],
+  "sips": {
+    "mf": [
+      { "scheme": "SBI ELSS Tax Saver Fund - Direct Plan - Growth", "amount": 5000, "date": 2, "holder": "nitin", "status": "active", "start_date": "2024-07-02" },
+      { "scheme": "SBI Contra Fund - Direct Plan - Growth", "amount": 5000, "date": 2, "holder": "nitin", "status": "active", "start_date": "2025-02-02" },
+      { "scheme": "ICICI Prudential Large Cap Fund", "amount": 5000, "date": 2, "holder": "nitin", "status": "active", "start_date": "2025-04-02" },
+      { "scheme": "Aditya Birla Sun Life Flexi Cap Fund - Growth-Direct Plan", "amount": 1500, "date": 2, "holder": "nitin", "status": "active", "start_date": "2025-03-02" },
+      { "scheme": "HDFC Mid Cap Fund - Direct Plan - Growth Option", "amount": 5000, "date": 1, "holder": "nitin", "status": "active", "start_date": "2025-03-01" },
+      { "scheme": "UTI Gold ETF Fund of Fund - Direct Plan", "amount": 5000, "date": 2, "holder": "nitin", "status": "active", "start_date": "2025-03-02" },
+      { "scheme": "Invesco India Small Cap Fund - Direct Plan Growth", "amount": 5000, "date": 7, "holder": "nitin", "status": "active", "start_date": "2025-03-07" },
+      { "scheme": "Kotak Large Cap Fund - Direct Plan - Growth", "amount": 2000, "date": 2, "holder": "nitin", "status": "active", "start_date": "2025-05-02" },
+      { "scheme": "NIPPON INDIA MULTI CAP FUND - DIRECT GROWTH PLAN GROWTH OPTION", "amount": 1500, "date": 2, "holder": "nitin", "status": "active", "start_date": "2025-03-02" },
+      { "scheme": "HDFC Dividend Yield Regular Growth", "amount": 6000, "date": 3, "holder": "indumati", "status": "active", "start_date": "2025-06-25" },
+      { "scheme": "ICICI Prudential Large Cap Fund (erstwhile Bluechip Fund) - Growth", "amount": 6000, "date": 3, "holder": "indumati", "status": "active", "start_date": "2025-06-25" },
+      { "scheme": "Edelweiss Multi Asset Allocation Fund - Regular Plan Growth", "amount": 6000, "date": 3, "holder": "indumati", "status": "active", "start_date": "2025-06-25" },
+      { "scheme": "SBI Multi Asset Allocation Fund Direct Growth", "amount": 5000, "date": 11, "holder": "indumati", "status": "active", "start_date": "2025-04-11" },
+      { "scheme": "Kotak Contra Fund - Growth (Regular Plan)", "amount": 4500, "date": 3, "holder": "indumati", "status": "active", "start_date": "2025-06-25" },
+      { "scheme": "Kotak Income Plus Arbitrage Omni FOF Regular Plan - Growth", "amount": 4500, "date": 3, "holder": "indumati", "status": "active", "start_date": "2025-06-25" },
+      { "scheme": "Invesco India Midcap Fund - Regular Plan Growth", "amount": 3000, "date": 3, "holder": "indumati", "status": "active", "start_date": "2025-06-25" }
+    ],
+    "etf_zerodha": [
+      { "symbol": "MIDQ50ADD", "qty": 15, "date": 2, "status": "active", "start_date": "2025-03-02" },
+      { "symbol": "MODEFENCE", "qty": 35, "date": 2, "status": "active", "start_date": "2025-03-02" },
+      { "symbol": "MAHKTECH", "qty": 100, "date": 2, "status": "active", "start_date": "2025-03-02" },
+      { "symbol": "MON100", "qty": 20, "date": 2, "status": "active", "start_date": "2025-03-02" },
+      { "symbol": "MASPTOP50", "qty": 0, "date": 2, "status": "paused", "start_date": "2025-03-02" }
+    ],
+    "etf_icici": [
+      { "symbol": "ICICIALPLV", "amount": 3000, "date": 2, "status": "active", "start_date": "2025-03-02" },
+      { "symbol": "ICICISILVE", "amount": 3000, "date": 2, "status": "active", "start_date": "2025-03-02" },
+      { "symbol": "ICICIGOLD", "amount": 2000, "date": 2, "status": "active", "start_date": "2023-11-02" }
+    ]
+  },
+  "assumptions": {
+    "mfEtfCagr": 12,
+    "stocksCagr": 15,
+    "monthlyStockBudget": 4000
+  }
+}
