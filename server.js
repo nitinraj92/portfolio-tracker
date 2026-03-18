@@ -85,8 +85,7 @@ function calcPortfolioSummary(data) {
     return a + (s.qty || 0) * price;
   }, 0);
 
-  // monthlyStockBudget excluded — stock purchases are ad-hoc, not SIPs
-  const monthlySIPs = mfSIPs + etfZSIPs + etfISIPs;
+  const monthlySIPs = mfSIPs + etfZSIPs + etfISIPs + (assumptions.monthlyStockBudget || 0);
 
   const r = n => Math.round(n * 100) / 100;
 
