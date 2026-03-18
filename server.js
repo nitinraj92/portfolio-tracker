@@ -56,6 +56,7 @@ function calcPortfolioSummary(data) {
   const mfInduVal   = mf_indumati.reduce((s, h) => s + (h.currentValue || (h.nav || 0) * h.units || 0), 0);
   const mfInduToday = mf_indumati.reduce((s, h) => s + (h.todayPL || 0), 0);
 
+  const realizedPLAmt = realized_pnl.totalRealizedPL || 0;
   const totalInvested = stocksInv + etfsInv + mfNitinInv + mfInduInv;
   const totalValue    = stocksVal + etfsVal + mfNitinVal + mfInduVal;
   const totalPL       = totalValue - totalInvested;
@@ -90,13 +91,10 @@ function calcPortfolioSummary(data) {
 
   const r = n => Math.round(n * 100) / 100;
 
-  const unrealizedPL   = r(totalPL);
-  const realizedPL     = r(realized_pnl.totalRealizedPL || 0);
-  const grandTotalPL   = r(unrealizedPL + realizedPL);
-  // % based on total invested across open + closed stock positions
-  const stocksRealBuy  = r(realized_pnl.totalBuyValue || 0);
-  const grandInvested  = r(totalInvested + stocksRealBuy);
-  const grandTotalPct  = grandInvested > 0 ? r((grandTotalPL / grandInvested) * 100) : 0;
+  const unrealizedPL  = r(totalPL);
+  const realizedPL    = r(realizedPLAmt);
+  const grandTotalPL  = r(unrealizedPL + realizedPL);
+  const grandTotalPct = totalInvested > 0 ? r((grandTotalPL / totalInvested) * 100) : 0;
 
   return {
     totalInvested: r(totalInvested),
@@ -113,12 +111,12 @@ function calcPortfolioSummary(data) {
     monthlySIPs:  r(monthlySIPs),
     segments: {
       stocks: {
-        invested:    r(stocksInv),
-        value:       r(stocksVal),
-        pl:          r(stocksVal - stocksInv),           // unrealized
-        realizedPL,                                       // realized (stocks only)
-        totalPL:     r(stocksVal - stocksInv + realizedPL), // combined
-        todayPL:     r(stocksToday),
+        invested:   r(stocksInv),
+        value:      r(stocksVal),
+        pl:         r(stocksVal - stocksInv),               // unrealized
+        realizedPL: r(realizedPLAmt),                       // realized (stocks only)
+        totalPL:    r(stocksVal - stocksInv + realizedPLAmt), // combined
+        todayPL:    r(stocksToday),
       },
       etfs:        { invested: r(etfsInv),    value: r(etfsVal),    pl: r(etfsVal - etfsInv),       todayPL: r(etfsToday) },
       mf_nitin:    { invested: r(mfNitinInv), value: r(mfNitinVal), pl: r(mfNitinVal - mfNitinInv), todayPL: r(mfNitinToday), xirr: nitinXIRR },
