@@ -58,29 +58,44 @@ def fetch(symbol, avg_cost=None, stored_exchange=None):
             wk52lo  = getattr(fi, 'year_low',                None)
             mktcap  = getattr(fi, 'market_cap',              None)
 
-            # PE ratio — try t.info quickly; skip silently if rate-limited
-            pe = None
+            # Fundamentals from t.info (skip silently if rate-limited)
+            pe = beta = book_value = div_yield = analyst_target = None
             try:
                 info = t.info or {}
-                raw_pe = info.get('trailingPE')
-                if raw_pe and not isinstance(raw_pe, str):
-                    pe = round(float(raw_pe), 2)
+                def _f(key):
+                    v = info.get(key)
+                    return float(v) if v and not isinstance(v, str) else None
+
+                pe             = _f('trailingPE')
+                beta           = _f('beta')
+                book_value     = _f('bookValue')
+                div_yield      = _f('dividendYield')   # as decimal e.g. 0.012
+                analyst_target = _f('targetMeanPrice')
+                if pe:           pe           = round(pe, 2)
+                if beta:         beta         = round(beta, 2)
+                if book_value:   book_value   = round(book_value, 2)
+                if div_yield:    div_yield    = round(div_yield, 2)  # already in % from Yahoo
+                if analyst_target: analyst_target = round(analyst_target, 2)
             except Exception:
-                pass  # rate limited or unavailable — leave as None
+                pass
 
             return {
-                'symbol':    symbol,
-                'exchange':  'BSE' if suffix == '.BO' else 'NSE',
-                'ticker':    ticker,
-                'price':     round(float(price), 2),
-                'prevClose': round(float(prev_close), 2) if prev_close else None,
-                'dma50':     round(float(dma50),  2) if dma50  else None,
-                'dma200':    round(float(dma200), 2) if dma200 else None,
-                'week52High':round(float(wk52hi), 2) if wk52hi else None,
-                'week52Low': round(float(wk52lo), 2) if wk52lo else None,
-                'marketCap': int(mktcap) if mktcap else None,
-                'pe':        pe,
-                'closes':    closes,
+                'symbol':         symbol,
+                'exchange':       'BSE' if suffix == '.BO' else 'NSE',
+                'ticker':         ticker,
+                'price':          round(float(price), 2),
+                'prevClose':      round(float(prev_close), 2) if prev_close else None,
+                'dma50':          round(float(dma50),  2) if dma50  else None,
+                'dma200':         round(float(dma200), 2) if dma200 else None,
+                'week52High':     round(float(wk52hi), 2) if wk52hi else None,
+                'week52Low':      round(float(wk52lo), 2) if wk52lo else None,
+                'marketCap':      int(mktcap) if mktcap else None,
+                'pe':             pe,
+                'beta':           beta,
+                'bookValue':      book_value,
+                'dividendYield':  div_yield,
+                'analystTarget':  analyst_target,
+                'closes':         closes,
             }
         except Exception as e:
             continue  # try next suffix

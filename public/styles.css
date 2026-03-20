@@ -121,7 +121,7 @@ select { font-size: 11px; border: 1px solid var(--border); border-radius: 4px; p
 /* Technical panel */
 .tech-panel { background: #f0f4ff; border-left: 3px solid var(--purple); padding: 14px 20px; }
 .tech-grid { display: flex; gap: 24px; flex-wrap: wrap; }
-.tech-section { flex: 1; min-width: 140px; }
+.tech-section { flex: 1; min-width: 160px; max-width: 400px; }
 .tech-label { font-size: 10px; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
 .tech-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; gap: 8px; }
 .tech-row span:first-child { color: var(--text-dim); }

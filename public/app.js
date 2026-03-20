@@ -270,6 +270,12 @@ function renderStocks() {
       + '<div class="tech-row"><span>P/E Ratio</span><span>' + (h.pe ? h.pe.toFixed(1) : '—') + '</span></div>'
       + '<div class="tech-row"><span>Market Cap</span><span>' + (h.marketCap ? '₹'+(h.marketCap/10000000).toFixed(1)+'Cr' : '—') + '</span></div>'
       + '</div>'
+      + '<div class="tech-section"><div class="tech-label">Analyst & Risk</div>'
+      + '<div class="tech-row"><span>Beta</span><span class="' + (!h.beta ? '' : h.beta > 1.2 ? 'val-red' : h.beta < 0.8 ? 'val-green' : '') + '">' + (h.beta ? h.beta.toFixed(2) : '—') + '</span></div>'
+      + '<div class="tech-row"><span>Book Value</span><span>' + (h.bookValue ? '₹'+h.bookValue.toFixed(1) : '—') + '</span></div>'
+      + '<div class="tech-row"><span>Dividend Yield</span><span>' + (h.dividendYield ? h.dividendYield.toFixed(2)+'%' : '—') + '</span></div>'
+      + '<div class="tech-row"><span>Analyst Target</span><span class="' + (h.analystTarget && h.ltp ? plCls(h.analystTarget - h.ltp) : '') + '">' + (h.analystTarget ? '₹'+h.analystTarget.toLocaleString('en-IN',{maximumFractionDigits:0}) : '—') + '</span></div>'
+      + '</div>'
       + '</div>';
 
     return '<tr onclick="toggleTechPanel(\'' + sym + '\')">'
