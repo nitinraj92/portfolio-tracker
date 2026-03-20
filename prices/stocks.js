@@ -55,8 +55,9 @@ async function refreshPrices(holdings) {
     }
 
     const ltp = data.price;
-    // Use stored prevClose from XLSX upload (reliable exchange data)
-    const prevClose = holding.prevClose || data.prevClose || ltp;
+    // Use freshly fetched prevClose (yesterday's actual close) for today's P&L.
+    // Falls back to XLSX upload value only if yfinance didn't return prevClose.
+    const prevClose = data.prevClose || holding.prevClose || ltp;
     const todayPL = Math.round((ltp - prevClose) * holding.qty * 100) / 100;
     const todayPLPct = prevClose > 0 ? Math.round(((ltp - prevClose) / prevClose) * 10000) / 100 : 0;
 

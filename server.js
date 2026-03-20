@@ -220,10 +220,12 @@ app.post('/api/prices/refresh', async (req, res) => {
     const data = db.read();
     data.stocks = await refreshPrices(data.stocks);
     data.etfs = await refreshPrices(data.etfs);
-    data.mf_nitin = await refreshMFPrices(data.mf_nitin);
-    data.mf_indumati = await refreshMFPrices(data.mf_indumati);
+    // Pass mf_scheme_codes by reference so lookups persist into data.mf_scheme_codes
+    // and are saved in the single db.write() below
+    data.mf_nitin    = await refreshMFPrices(data.mf_nitin,    data.mf_scheme_codes);
+    data.mf_indumati = await refreshMFPrices(data.mf_indumati, data.mf_scheme_codes);
     data.lastUpdated.prices = new Date().toISOString();
-    db.write(data);
+    db.write(data); // Single write — stocks/etfs/mf all correct, scheme codes persisted
     res.json({ success: true, refreshedAt: data.lastUpdated.prices });
   } catch (err) {
     res.status(500).json({ error: err.message });
