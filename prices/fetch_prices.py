@@ -69,13 +69,19 @@ def fetch(symbol, avg_cost=None, stored_exchange=None):
                 pe             = _f('trailingPE')
                 beta           = _f('beta')
                 book_value     = _f('bookValue')
-                div_yield      = _f('dividendYield')   # as decimal e.g. 0.012
+                div_yield      = _f('dividendYield')
                 analyst_target = _f('targetMeanPrice')
+                eps            = _f('trailingEps')
+                roe            = _f('returnOnEquity')   # decimal e.g. 0.18 = 18%
+                debt_equity    = _f('debtToEquity')
                 if pe:           pe           = round(pe, 2)
                 if beta:         beta         = round(beta, 2)
                 if book_value:   book_value   = round(book_value, 2)
-                if div_yield:    div_yield    = round(div_yield, 2)  # already in % from Yahoo
+                if div_yield:    div_yield    = round(div_yield, 2)
                 if analyst_target: analyst_target = round(analyst_target, 2)
+                if eps:          eps          = round(eps, 2)
+                if roe:          roe          = round(roe * 100, 1)  # to %
+                if debt_equity:  debt_equity  = round(debt_equity, 2)
             except Exception:
                 pass
 
@@ -91,6 +97,9 @@ def fetch(symbol, avg_cost=None, stored_exchange=None):
                 'week52Low':      round(float(wk52lo), 2) if wk52lo else None,
                 'marketCap':      int(mktcap) if mktcap else None,
                 'pe':             pe,
+                'eps':            eps,
+                'roe':            roe,
+                'debtEquity':     debt_equity,
                 'beta':           beta,
                 'bookValue':      book_value,
                 'dividendYield':  div_yield,
