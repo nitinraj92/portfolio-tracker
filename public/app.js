@@ -339,8 +339,17 @@ function renderETFs() {
   const getSIPLabel = sym => {
     const z = (sips.etf_zerodha||[]).find(s => s.symbol === sym);
     const i = (sips.etf_icici||[]).find(s => s.symbol === sym);
-    if (z && z.status === 'active') return z.qty + ' units/mo (~' + fmt(z.qty * 220) + ')';
-    if (i && i.status === 'active') return fmt(i.amount) + '/mo';
+    const etf = etfs.find(e => e.symbol === sym);
+    const ltp = etf ? (etf.ltp || etf.avgCost || 0) : 0;
+    if (z && z.status === 'active') {
+      if (z.mode === 'amount' && z.amount) return fmt(z.amount) + '/mo';
+      const approx = ltp > 0 ? ' (~' + fmt(z.qty * ltp) + ')' : '';
+      return (z.qty || 0) + ' units/mo' + approx;
+    }
+    if (i && i.status === 'active') {
+      if (i.mode === 'qty' && i.qty && ltp > 0) return (i.qty||0) + ' units/mo (~' + fmt(i.qty * ltp) + ')';
+      return fmt(i.amount) + '/mo';
+    }
     if ((z && z.status === 'paused') || (i && i.status === 'paused')) return '⏸ Paused';
     return '—';
   };
@@ -350,10 +359,12 @@ function renderETFs() {
     return !!(z || i);
   };
 
-  document.getElementById('etfs-content').innerHTML = ETF_CAT_ORDER
+  // Single table with category separator rows — no repeated headers, aligned columns
+  const allRows = ETF_CAT_ORDER
     .filter(cat => groups[cat].length > 0)
     .map(cat => {
-      const rows = groups[cat].map(e => {
+      const catRow = '<tr><td colspan="9" class="etf-group-header ' + ETF_CAT_CLS[cat] + '" style="padding:8px 10px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:#fafafa;border-bottom:1px solid #e2e8f0">' + sanitize(cat) + '</td></tr>';
+      const dataRows = groups[cat].map(e => {
         const sym  = sanitize(e.symbol || '');
         const eVal = (e.ltp||0)*e.qty;
         const ePL  = eVal - (e.avgCost||0)*e.qty;
@@ -371,12 +382,14 @@ function renderETFs() {
           + '<td><span class="thesis-tag ' + t.cls + '">' + sanitize(t.tag) + '</span></td>'
           + '</tr>';
       }).join('');
-      return '<div class="etf-group"><div class="etf-group-header ' + ETF_CAT_CLS[cat] + '">' + sanitize(cat) + '</div>'
-        + '<div class="table-wrap"><table class="data-table"><thead><tr>'
-        + '<th>ETF</th><th>QTY</th><th>AVG</th><th>NAV <span class="live-dot">●</span></th>'
-        + '<th>VALUE</th><th>TOTAL P&amp;L</th><th>TODAY</th><th>SIP/MONTH</th><th>THESIS</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      return catRow + dataRows;
     }).join('');
+
+  document.getElementById('etfs-content').innerHTML =
+    '<div class="table-wrap"><table class="data-table"><thead><tr>'
+    + '<th>ETF</th><th>QTY</th><th>AVG</th><th>NAV <span class="live-dot">●</span></th>'
+    + '<th>VALUE</th><th>TOTAL P&amp;L</th><th>TODAY</th><th>SIP/MONTH</th><th>THESIS</th>'
+    + '</tr></thead><tbody>' + allRows + '</tbody></table></div>';
 }
 
 // ── MF Tab ────────────────────────────────────────────────────────────────
@@ -405,14 +418,28 @@ function renderMF() {
     '<span>MF SIPs: <strong>' + fmt(mfSIPTotal) + '/mo</strong></span>' +
     (combinedXIRR != null ? '<span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:8px;font-size:11px">Combined XIRR <strong>' + combinedXIRR.toFixed(1) + '%</strong></span>' : '');
 
+  // Build SIP lookup from settings — keyed by scheme name
+  // Match by extracting key fund words (ignore plan/growth/regular/direct suffixes)
+  function normScheme(s) {
+    return (s||'').toLowerCase()
+      .replace(/direct\s+plan/g,'').replace(/regular\s+plan/g,'')
+      .replace(/\s*-\s*growth/g,'').replace(/growth\s+option/g,'')
+      .replace(/\(erstwhile[^)]*\)/g,'').replace(/\(formerly[^)]*\)/g,'')
+      .replace(/\s{2,}/g,' ').trim().substring(0, 30);
+  }
   const sipMap = {};
-  (sips.mf||[]).forEach(s => { sipMap[s.scheme] = s; });
+  (sips.mf||[]).forEach(s => { sipMap[normScheme(s.scheme)] = s; });
   const findSIP = scheme => {
-    const key = Object.keys(sipMap).find(k =>
-      (scheme||'').toLowerCase().includes(k.toLowerCase().substring(0,18)) ||
-      k.toLowerCase().includes((scheme||'').toLowerCase().substring(0,18))
-    );
-    return key ? sipMap[key] : null;
+    const norm = normScheme(scheme);
+    // Exact norm match first
+    if (sipMap[norm]) return sipMap[norm];
+    // Partial match: longest common key
+    let best = null, bestLen = 0;
+    Object.entries(sipMap).forEach(([k, v]) => {
+      const overlap = norm.includes(k) || k.includes(norm.substring(0, Math.min(norm.length, 20)));
+      if (overlap && k.length > bestLen) { best = v; bestLen = k.length; }
+    });
+    return best;
   };
 
   function buildSection(holdings, holder) {
