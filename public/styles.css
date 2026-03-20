@@ -423,3 +423,8 @@ input[type="file"].hidden { display: none; }
   .tech-section .health-icon { font-size: 20px; margin: 4px 0; }
   .tech-section .health-text { font-size: 12px; }
 }
+
+/* Centre P&L card subs (%, Today) in row-2 on desktop */
+.cards-row-2 .card-sub,
+.cards-row-2 .card-label,
+.cards-row-2 .card-value { text-align: center; }

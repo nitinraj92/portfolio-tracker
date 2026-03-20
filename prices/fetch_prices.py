@@ -58,8 +58,15 @@ def fetch(symbol, avg_cost=None, stored_exchange=None):
             wk52lo  = getattr(fi, 'year_low',                None)
             mktcap  = getattr(fi, 'market_cap',              None)
 
-            # PE ratio — from fast_info if available, else skip (avoids t.info call)
+            # PE ratio — try t.info quickly; skip silently if rate-limited
             pe = None
+            try:
+                info = t.info or {}
+                raw_pe = info.get('trailingPE')
+                if raw_pe and not isinstance(raw_pe, str):
+                    pe = round(float(raw_pe), 2)
+            except Exception:
+                pass  # rate limited or unavailable — leave as None
 
             return {
                 'symbol':    symbol,

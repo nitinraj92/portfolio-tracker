@@ -270,10 +270,7 @@ function renderStocks() {
       + '<div class="tech-row"><span>P/E Ratio</span><span>' + (h.pe ? h.pe.toFixed(1) : '—') + '</span></div>'
       + '<div class="tech-row"><span>Market Cap</span><span>' + (h.marketCap ? '₹'+(h.marketCap/10000000).toFixed(1)+'Cr' : '—') + '</span></div>'
       + '</div>'
-      + '<div class="tech-section" style="text-align:center"><div class="tech-label">Health</div>'
-      + '<div style="font-size:28px;margin:8px 0">' + (h.health==='Healthy'?'🟢':h.health==='Weak'?'🔴':'🟡') + '</div>'
-      + '<div class="' + plCls(h.health==='Healthy'?1:h.health==='Weak'?-1:0) + '" style="font-weight:700;font-size:14px">' + sanitize(h.health||'Neutral') + '</div>'
-      + '</div></div>';
+      + '</div>';
 
     return '<tr onclick="toggleTechPanel(\'' + sym + '\')">'
       + '<td><div class="ticker-name">' + sym + '</div><div class="ticker-sub">' + sanitize(h.sector||'') + '</div>' + badges + '</td>'
