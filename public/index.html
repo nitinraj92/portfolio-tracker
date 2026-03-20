@@ -21,41 +21,43 @@
     </div>
 
     <div class="summary-cards">
-      <div class="summary-card">
-        <div class="card-label">Total Portfolio</div>
-        <div class="card-value" id="total-value">—</div>
-        <div class="card-sub" id="total-invested">Invested: —</div>
+      <!-- Desktop Row 1 / Mobile Row 1: Total Portfolio + Monthly SIPs + Allocation -->
+      <div class="cards-row cards-row-1">
+        <div class="summary-card">
+          <div class="card-label">Total Portfolio</div>
+          <div class="card-value" id="total-value">—</div>
+          <div class="card-sub" id="total-invested">Invested: —</div>
+        </div>
+        <div class="divider"></div>
+        <div class="summary-card">
+          <div class="card-label">Monthly SIPs</div>
+          <div class="card-value" id="monthly-sips">—</div>
+        </div>
+        <div class="divider"></div>
+        <div class="allocation-bars" id="allocation-bars"></div>
       </div>
-      <div class="divider"></div>
-      <div class="summary-card">
-        <div class="card-label">Unrealized P&amp;L</div>
-        <div class="card-value" id="total-pl">—</div>
-        <div class="card-sub" id="total-pl-pct"></div>
+
+      <!-- Desktop Row 2 / Mobile Rows 2+3: P&L cards -->
+      <div class="cards-row cards-row-2">
+        <div class="summary-card">
+          <div class="card-label">Realized P&amp;L</div>
+          <div class="card-value" id="realized-pl">—</div>
+          <div class="card-sub" id="realized-pl-sub"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="summary-card">
+          <div class="card-label">Unrealized P&amp;L</div>
+          <div class="card-value" id="total-pl">—</div>
+          <div class="card-sub" id="total-pl-pct"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="summary-card">
+          <div class="card-label">Total P&amp;L</div>
+          <div class="card-value" id="grand-total-pl">—</div>
+          <div class="card-sub" id="grand-total-pl-pct"></div>
+          <div class="card-sub" id="today-pl-sub" style="margin-top:2px;font-size:10px"></div>
+        </div>
       </div>
-      <div class="divider"></div>
-      <div class="summary-card">
-        <div class="card-label">Realized P&amp;L</div>
-        <div class="card-value" id="realized-pl">—</div>
-        <div class="card-sub" id="realized-pl-sub"></div>
-      </div>
-      <div class="divider"></div>
-      <div class="summary-card">
-        <div class="card-label">Total P&amp;L</div>
-        <div class="card-value" id="grand-total-pl">—</div>
-        <div class="card-sub" id="grand-total-pl-pct"></div>
-      </div>
-      <div class="divider"></div>
-      <div class="summary-card">
-        <div class="card-label">Today's P&amp;L</div>
-        <div class="card-value" id="today-pl">—</div>
-      </div>
-      <div class="divider"></div>
-      <div class="summary-card">
-        <div class="card-label">Monthly SIPs</div>
-        <div class="card-value" id="monthly-sips">—</div>
-      </div>
-      <div class="divider"></div>
-      <div class="allocation-bars" id="allocation-bars"></div>
     </div>
 
     <div class="segment-strip">

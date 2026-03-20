@@ -30,8 +30,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .market-badge.open { color: var(--green); }
 .refresh-info { font-size: 11px; color: var(--text-dim); }
 
-/* Summary cards */
-.summary-cards { background: var(--header-mid); padding: 14px 24px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+/* Summary cards — 2 rows on desktop */
+.summary-cards { background: var(--header-mid); padding: 0; display: flex; flex-direction: column; }
+.cards-row { display: flex; align-items: center; gap: 20px; padding: 10px 24px; }
+.cards-row-1 { border-bottom: 1px solid var(--header-light); }
 .summary-card { flex: 1; min-width: 120px; }
 .card-label { color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
 .card-value { color: var(--text-white); font-size: 22px; font-weight: 700; margin-top: 2px; }
@@ -261,3 +263,163 @@ input[type="file"].hidden { display: none; }
 /* Utils */
 .font-bold { font-weight: 700; }
 .text-muted { color: var(--text-muted); }
+
+/* ── Mobile Responsive (max 768px) ──────────────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Header top: hide countdown, compact layout */
+  .header-top { padding: 8px 12px; }
+  .app-title { font-size: 13px; }
+  .refresh-info { display: none; }
+  .market-badge { font-size: 10px; }
+  #btn-refresh { padding: 5px 10px; font-size: 11px; }
+
+  /* Summary cards: rows stack, each row goes 2-col grid */
+  .summary-cards { padding: 0; }
+  .cards-row { flex-wrap: wrap; padding: 6px 10px; gap: 0; }
+  .divider { display: none; }
+  .summary-card { min-width: 0; flex: 0 0 50%; padding: 6px 8px; }
+  .card-value { font-size: 16px; }
+  .card-label { font-size: 9px; }
+  .card-sub { font-size: 10px; }
+  /* Row 1: Portfolio + SIPs side by side; hide allocation bars */
+  .cards-row-1 { border-bottom: 1px solid var(--header-light); }
+  .allocation-bars { display: none; }
+
+  /* Segment strip: 2x2 grid */
+  .segment-strip { display: grid; grid-template-columns: 1fr 1fr; }
+  .segment-item { border-right: none; border-bottom: 1px solid var(--header-light); padding: 5px 8px; }
+  .seg-pl { font-size: 11px; }
+  .seg-today, .seg-xirr { font-size: 10px; }
+
+  /* Tab nav: horizontally scrollable, smaller text */
+  .tab-nav { padding: 0 4px; gap: 0; }
+  .tab-btn { padding: 10px 10px; font-size: 11px; white-space: nowrap; }
+
+  /* Section bars */
+  .section-bar { padding: 8px 12px; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .section-bar-right { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+  .filter-input { width: 100%; flex: 1; }
+  .section-title { font-size: 13px; }
+
+  /* Summary strip: wrap with smaller gaps */
+  .summary-strip { padding: 6px 12px; gap: 10px; font-size: 10px; }
+
+  /* Tables: horizontal scroll, more compact */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .data-table { font-size: 11px; min-width: 600px; }
+  .data-table th { padding: 7px 6px; font-size: 10px; }
+  .data-table td { padding: 7px 6px; }
+
+  /* Tech panel: stack vertically */
+  .tech-grid { flex-direction: column; gap: 12px; }
+  .tech-section { min-width: 0; }
+
+  /* MF section */
+  .mf-section-header { flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; }
+  .mf-section-stats { font-size: 10px; }
+
+  /* Source cards: single column */
+  .source-cards { grid-template-columns: 1fr; padding: 12px; gap: 10px; }
+  .source-card { padding: 14px; }
+
+  /* Wealth projection */
+  .assumptions-bar { padding: 8px 12px; gap: 10px; flex-wrap: wrap; }
+  .assump-input { width: 60px; }
+  .milestone-cards { grid-template-columns: 1fr; padding: 12px; gap: 10px; }
+  .milestone-value { font-size: 26px; }
+  .chart-card { margin: 0 12px; padding: 12px; margin-bottom: 12px; }
+  .year-table-card { margin: 0 12px 12px; padding: 12px; }
+
+  /* Settings */
+  .settings-tabs { overflow-x: auto; }
+  .stab { padding: 10px 12px; font-size: 11px; white-space: nowrap; }
+  .settings-panel { padding: 12px; }
+  .settings-table { font-size: 11px; }
+  .settings-table th, .settings-table td { padding: 6px 6px; }
+  .settings-input { width: 65px; }
+  .assump-grid { flex-direction: column; gap: 12px; }
+  .settings-footer { padding: 10px 12px; }
+
+  /* Upload history table */
+  .upload-history-wrap { margin: 0 12px 12px; padding: 12px; }
+  .history-table { font-size: 10px; }
+
+  /* Buttons in section bar */
+  .btn-primary, .btn-secondary, .btn-danger { padding: 5px 10px; font-size: 11px; }
+
+  /* ETF group headers */
+  .etf-group-header { padding: 6px 12px 3px; }
+}
+
+/* Extra small (iPhone SE etc.) */
+@media (max-width: 390px) {
+  .summary-cards { grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 8px; }
+  .card-value { font-size: 14px; }
+  .tab-btn { padding: 9px 8px; font-size: 10px; }
+  .data-table { min-width: 500px; }
+}
+
+/* ── Mobile: centre all summary cards, top bar sizing ───────────────── */
+@media (max-width: 768px) {
+
+  /* All cards centred on mobile */
+  .summary-card { text-align: center; }
+  .summary-card .card-value,
+  .summary-card .card-label,
+  .summary-card .card-sub { text-align: center; }
+
+  /* Row 1 cards (Total Portfolio + Monthly SIPs): slightly larger */
+  .cards-row-1 .summary-card .card-value { font-size: 20px; }
+  /* Row 2 P&L cards: 4 cards in 2×2 grid */
+  .cards-row-2 { display: flex; flex-wrap: wrap; }
+
+  /* Top bar slightly larger than segment strip */
+  .header-top { padding: 10px 14px; }
+  .app-title { font-size: 14px; }
+  .segment-item { padding: 4px 6px; font-size: 10px; }
+  .seg-name { font-size: 9px; }
+  .seg-pl { font-size: 10px; }
+  .seg-today, .seg-xirr { font-size: 9px; }
+}
+
+/* Total P&L (last card in row-2): full-width + centred on mobile */
+@media (max-width: 768px) {
+  .cards-row-2 .summary-card:last-child {
+    flex: 0 0 100%;
+    text-align: center;
+  }
+  .cards-row-2 .summary-card:last-child .card-value,
+  .cards-row-2 .summary-card:last-child .card-sub,
+  .cards-row-2 .summary-card:last-child .card-label { text-align: center; }
+}
+
+/* Fix tech panel on mobile:
+   - tech-panel is now a <div> inside <td> so width constraints work
+   - TD gets page-bg to hide empty table space to the right
+   - tech-grid stacks vertically */
+@media (max-width: 768px) {
+  /* TD wrapper: no padding, page background hides the empty 600px table space */
+  td:has(.tech-panel) {
+    padding: 0 !important;
+    background: var(--bg) !important;
+  }
+
+  /* tech-panel div: constrained to viewport width */
+  .tech-panel {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: 12px 14px;
+    background: #f0f4ff;
+    border-left: 3px solid var(--purple);
+    border-right: none;
+  }
+  .tech-grid { flex-direction: column; gap: 10px; }
+  .tech-section { padding-right: 0; border-right: none; min-width: 0; }
+  .tech-row { font-size: 11px; gap: 4px; }
+  .tech-row span:last-child { text-align: right; font-weight: 600; }
+  .tech-section .health-icon { font-size: 20px; margin: 4px 0; }
+  .tech-section .health-text { font-size: 12px; }
+}

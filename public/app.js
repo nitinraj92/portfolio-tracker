@@ -130,21 +130,23 @@ function renderDashboard() {
   const upl = summary.unrealizedPL || 0;
   plEl.textContent = sign(upl) + fmt(upl);
   plEl.className = 'card-value ' + plCls(upl);
-  document.getElementById('total-pl-pct').textContent = fmtPct(summary.unrealizedPLPct || 0);
+  document.getElementById('total-pl-pct').textContent = '(' + fmtPct(summary.unrealizedPLPct || 0) + ')';
 
-  // Grand Total P&L
+  // Total P&L (combined card: value + % + today as sub-line)
   const gtEl = document.getElementById('grand-total-pl');
   if (gtEl) {
     const gpl = summary.grandTotalPL || 0;
-    gtEl.textContent = sign(gpl) + fmt(gpl);
+    gtEl.textContent = sign(gpl) + fmt(gpl) + ' (' + fmtPct(summary.grandTotalPct || 0) + ')';
     gtEl.className = 'card-value ' + plCls(gpl);
     const gtPct = document.getElementById('grand-total-pl-pct');
-    if (gtPct) gtPct.textContent = fmtPct(summary.grandTotalPct || 0);
+    if (gtPct) gtPct.textContent = '';
+    const todaySub = document.getElementById('today-pl-sub');
+    if (todaySub) {
+      const tdpl = summary.totalTodayPL || 0;
+      todaySub.textContent = 'Today: ' + sign(tdpl) + fmt(tdpl);
+      todaySub.style.color = tdpl >= 0 ? 'var(--green)' : 'var(--red)';
+    }
   }
-
-  const todayEl = document.getElementById('today-pl');
-  todayEl.textContent = sign(summary.totalTodayPL) + fmt(summary.totalTodayPL);
-  todayEl.className = 'card-value ' + plCls(summary.totalTodayPL);
 
   document.getElementById('monthly-sips').textContent = fmt(summary.monthlySIPs);
 
@@ -188,12 +190,7 @@ function renderDashboard() {
     if (!el || !seg) return;
     const plPct = seg.invested ? (seg.pl / seg.invested * 100) : 0;
 
-    // Stocks get an extra realized + total line
-    const isStocks = id === 'seg-stocks';
-    const extraLines = isStocks && seg.realizedPL != null
-      ? '<div class="seg-today ' + plCls(seg.realizedPL) + '">Realized: ' + sign(seg.realizedPL) + fmt(seg.realizedPL) + '</div>'
-        + '<div class="seg-xirr ' + plCls(seg.totalPL || 0) + '">Total: ' + sign(seg.totalPL || 0) + fmt(seg.totalPL || 0) + '</div>'
-      : '';
+    const extraLines = '';
 
     el.innerHTML = '<div class="seg-name">' + sanitize(name) + '</div>'
       + '<div class="seg-pl ' + plCls(seg.pl) + '">' + sign(seg.pl) + fmt(seg.pl) + ' (' + fmtPct(plPct) + ')</div>'
@@ -290,7 +287,7 @@ function renderStocks() {
       + '<td>' + week52Bar(h.ltp||0, h.week52Low, h.week52High) + '</td>'
       + '<td class="expand-btn" id="expand-' + sym + '">▶ details</td>'
       + '</tr>'
-      + '<tr id="panel-' + sym + '" style="display:none"><td colspan="10" class="tech-panel">' + techHtml + '</td></tr>';
+      + '<tr id="panel-' + sym + '" style="display:none"><td colspan="10" style="padding:0;background:var(--bg)"><div class="tech-panel">' + techHtml + '</div></td></tr>';
   }).join('');
 }
 
