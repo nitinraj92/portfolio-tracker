@@ -93,6 +93,7 @@ async function refreshPrices(holdings) {
       pe:             data.pe            || null,
       eps:            data.eps           || null,
       roe:            data.roe           || null,
+      netMargin:      data.netMargin     || null,
       debtEquity:     data.debtEquity    || null,
       marketCap:      data.marketCap     || null,
       beta:           data.beta          || null,

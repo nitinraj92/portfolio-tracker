@@ -72,7 +72,8 @@ def fetch(symbol, avg_cost=None, stored_exchange=None):
                 div_yield      = _f('dividendYield')
                 analyst_target = _f('targetMeanPrice')
                 eps            = _f('trailingEps')
-                roe            = _f('returnOnEquity')   # decimal e.g. 0.18 = 18%
+                roe            = _f('returnOnEquity')    # decimal e.g. 0.18 = 18%
+                net_margin     = _f('profitMargins')     # fallback if ROE unavailable
                 debt_equity    = _f('debtToEquity')
                 if pe:           pe           = round(pe, 2)
                 if beta:         beta         = round(beta, 2)
@@ -80,7 +81,8 @@ def fetch(symbol, avg_cost=None, stored_exchange=None):
                 if div_yield:    div_yield    = round(div_yield, 2)
                 if analyst_target: analyst_target = round(analyst_target, 2)
                 if eps:          eps          = round(eps, 2)
-                if roe:          roe          = round(roe * 100, 1)  # to %
+                if roe:          roe          = round(roe * 100, 1)       # to %
+                if net_margin:   net_margin   = round(net_margin * 100, 1) # to %
                 if debt_equity:  debt_equity  = round(debt_equity, 2)
             except Exception:
                 pass
@@ -99,6 +101,7 @@ def fetch(symbol, avg_cost=None, stored_exchange=None):
                 'pe':             pe,
                 'eps':            eps,
                 'roe':            roe,
+                'netMargin':      net_margin,
                 'debtEquity':     debt_equity,
                 'beta':           beta,
                 'bookValue':      book_value,

@@ -269,7 +269,12 @@ function renderStocks() {
       + '<div class="tech-section"><div class="tech-label">Fundamentals</div>'
       + '<div class="tech-row"><span>P/E Ratio</span><span>' + (h.pe ? h.pe.toFixed(1) : '—') + '</span></div>'
       + '<div class="tech-row"><span>EPS (TTM)</span><span>' + (h.eps ? '₹'+h.eps.toFixed(2) : '—') + '</span></div>'
-      + '<div class="tech-row"><span>ROE</span><span class="' + (h.roe ? (h.roe > 15 ? 'val-green' : h.roe < 8 ? 'val-red' : '') : '') + '">' + (h.roe ? h.roe.toFixed(1)+'%' : '—') + '</span></div>'
+      + (function() {
+          const v = h.roe || h.netMargin;
+          const lbl = h.roe ? 'ROE' : 'Net Margin';
+          const cls = v ? (v > 15 ? 'val-green' : v < 5 ? 'val-red' : '') : '';
+          return '<div class="tech-row"><span>' + lbl + '</span><span class="' + cls + '">' + (v ? v.toFixed(1)+'%' : '—') + '</span></div>';
+        })()
       + '<div class="tech-row"><span>Debt / Equity</span><span class="' + (h.debtEquity != null ? (h.debtEquity > 1 ? 'val-red' : 'val-green') : '') + '">' + (h.debtEquity != null ? h.debtEquity.toFixed(2) : '—') + '</span></div>'
       + '<div class="tech-row"><span>Market Cap</span><span>' + (h.marketCap ? '₹'+(h.marketCap/10000000).toFixed(1)+'Cr' : '—') + '</span></div>'
       + '</div>'
