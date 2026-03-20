@@ -510,15 +510,34 @@ const SOURCE_CONFIG = [...SOURCE_STOCKS_ETFS, ...SOURCE_MF];
 
 function renderSources() {
   if (!portfolio) return;
-  const { lastUpdated = {}, upload_history = [] } = portfolio;
+  const { lastUpdated = {}, upload_history = [], source_metadata = {} } = portfolio;
 
   function buildCard(src) {
     const ts    = lastUpdated[src.id];
     const stale = isStale(ts);
-    const nextDate = ts ? new Date(ts).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' }) : 'Never';
-    const hintHtml = (src.iconCls === 'nitin' || src.iconCls === 'indu')
-      ? '📅 Next CAS from: <strong>' + sanitize(nextDate) + '</strong>'
-      : '📥 ' + sanitize(src.hint);
+    const meta  = source_metadata[src.id] || null;
+
+    // Build the rich hint line based on file metadata
+    let hintHtml = '';
+    if (meta && meta.label) {
+      // Zerodha Holdings: "Equity Holdings Statement as on 2026-03-18"
+      // Zerodha P&L:     "P&L Statement for Equity from 2025-04-01 to 2026-03-18"
+      // MFCentral:       "CAS from 01-Jan-2023 to 20-Mar-2026"
+      hintHtml = '📄 <strong>' + sanitize(meta.label) + '</strong>';
+    } else if (src.iconCls === 'nitin' || src.iconCls === 'indu') {
+      // MFCentral fallback: show next CAS hint
+      const nextDate = ts ? new Date(ts).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' }) : 'Never';
+      hintHtml = '📅 Next CAS from: <strong>' + sanitize(nextDate) + '</strong>';
+    } else {
+      hintHtml = '📥 ' + sanitize(src.hint);
+    }
+
+    // For MFCentral, also show date range if available
+    if (meta && meta.fromDate && meta.toDate && (src.iconCls === 'nitin' || src.iconCls === 'indu')) {
+      hintHtml = '📄 CAS: <strong>' + sanitize(meta.fromDate) + '</strong> → <strong>' + sanitize(meta.toDate) + '</strong>'
+        + '<br><span style="font-size:10px;color:#64748b">Next upload: from ' + sanitize(meta.toDate) + ' onwards</span>';
+    }
+
     return '<div class="source-card">'
       + '<input type="file" id="file-' + src.id + '" class="hidden" accept="' + src.accept + '" onchange="handleFileInput(\'' + src.id + '\',\'' + src.endpoint + '\',this)">'
       + '<div class="source-card-header">'

@@ -21,7 +21,53 @@ const ETF_CATEGORIES = {
 };
 
 const app = express();
-const upload = multer({ dest: 'uploads/' });
+
+// Save uploaded files permanently to data_sources/ with original filename
+const DATA_SOURCES_DIR = path.join(__dirname, 'data_sources');
+if (!require('fs').existsSync(DATA_SOURCES_DIR)) require('fs').mkdirSync(DATA_SOURCES_DIR);
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, DATA_SOURCES_DIR),
+    filename:    (req, file, cb) => cb(null, file.originalname),
+  })
+});
+
+// Extract file metadata (statement dates) from uploaded Zerodha/CAS files
+function extractFileMetadata(filePath, sourceType) {
+  const XLSX = require('xlsx');
+  try {
+    const wb   = XLSX.readFile(filePath);
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    if (sourceType === 'zerodha') {
+      // Row 11 (0-indexed 10): "Equity Holdings Statement as on 2026-03-18"
+      for (let i = 0; i < Math.min(rows.length, 15); i++) {
+        const cell = String(rows[i][1] || rows[i][0] || '');
+        if (/equity holdings statement/i.test(cell)) return { label: cell.trim() };
+      }
+    }
+    if (sourceType === 'realized_pnl') {
+      // Row 11 (0-indexed 10): "P&L Statement for Equity from 2025-04-01 to 2026-03-18"
+      for (let i = 0; i < Math.min(rows.length, 15); i++) {
+        const cell = String(rows[i][1] || rows[i][0] || '');
+        if (/p&l statement/i.test(cell)) return { label: cell.trim() };
+      }
+    }
+    if (sourceType === 'mfcentral') {
+      // Rows 6-7: From Date / To Date
+      let fromDate = '', toDate = '';
+      for (let i = 0; i < Math.min(rows.length, 10); i++) {
+        const key = String(rows[i][0] || rows[i][1] || '').trim();
+        const val = String(rows[i][1] || rows[i][2] || '').trim();
+        if (/from date/i.test(key)) fromDate = val;
+        if (/to date/i.test(key))   toDate   = val;
+      }
+      if (fromDate && toDate) return { fromDate, toDate, label: 'CAS from ' + fromDate + ' to ' + toDate };
+    }
+  } catch {}
+  return null;
+}
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -153,18 +199,20 @@ app.post('/api/upload/zerodha', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   try {
     const { stocks, etfs: zEtfs } = parseZerodha(req.file.path);
+    const meta = extractFileMetadata(req.file.path, 'zerodha');
     const data = db.read();
     const prevICICIEtfs = data.etfs.filter(e => e.source === 'icici');
     data.stocks = stocks;
     data.etfs = [...prevICICIEtfs, ...zEtfs];
+    if (!data.source_metadata) data.source_metadata = {};
+    data.source_metadata.zerodha = meta;
     db.write(data);
     db.setTimestamp('zerodha');
     const diff = { stocks: { updated: stocks.length }, etfs: { updated: zEtfs.length } };
-    db.addUploadHistory({ source: 'zerodha', filename: req.file.originalname || req.file.filename, changes: diff });
-    try { fs.unlinkSync(req.file.path); } catch {}
-    res.json({ success: true, diff });
+    db.addUploadHistory({ source: 'zerodha', filename: req.file.originalname, changes: diff });
+    // File already saved to data_sources/ by multer — no unlink needed
+    res.json({ success: true, diff, meta });
   } catch (err) {
-    try { fs.unlinkSync(req.file.path); } catch {}
     res.status(500).json({ error: err.message });
   }
 });
@@ -179,11 +227,9 @@ app.post('/api/upload/icici', upload.single('file'), (req, res) => {
     db.write(data);
     db.setTimestamp('icici');
     const diff = { etfs: { updated: etfs.length } };
-    db.addUploadHistory({ source: 'icici', filename: req.file.originalname || req.file.filename, changes: diff });
-    try { fs.unlinkSync(req.file.path); } catch {}
+    db.addUploadHistory({ source: 'icici', filename: req.file.originalname, changes: diff });
     res.json({ success: true, diff });
   } catch (err) {
-    try { fs.unlinkSync(req.file.path); } catch {}
     res.status(500).json({ error: err.message });
   }
 });
@@ -192,25 +238,26 @@ app.post('/api/upload/mfcentral', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   try {
     const { holder, holdings } = parseMFCentral(req.file.path);
+    const meta = extractFileMetadata(req.file.path, 'mfcentral');
     const data = db.read();
+    if (!data.source_metadata) data.source_metadata = {};
     if (holder === 'nitin') {
       data.mf_nitin = holdings;
+      data.source_metadata.mfcentral_nitin = meta;
       db.write(data);
       db.setTimestamp('mfcentral_nitin');
     } else if (holder === 'indumati') {
       data.mf_indumati = holdings;
+      data.source_metadata.mfcentral_indumati = meta;
       db.write(data);
       db.setTimestamp('mfcentral_indumati');
     } else {
-      try { fs.unlinkSync(req.file.path); } catch {}
       return res.status(400).json({ error: 'Could not detect holder from PAN in file' });
     }
     const diff = { holder, updated: holdings.length };
-    db.addUploadHistory({ source: 'mfcentral_' + holder, filename: req.file.originalname || req.file.filename, changes: diff });
-    try { fs.unlinkSync(req.file.path); } catch {}
-    res.json({ success: true, diff });
+    db.addUploadHistory({ source: 'mfcentral_' + holder, filename: req.file.originalname, changes: diff });
+    res.json({ success: true, diff, meta });
   } catch (err) {
-    try { fs.unlinkSync(req.file.path); } catch {}
     res.status(500).json({ error: err.message });
   }
 });
@@ -303,16 +350,18 @@ app.post('/api/upload/realized-pnl', upload.single('file'), (req, res) => {
     const winners          = merged.filter(e => e.realizedPL > 0).length;
     const losers           = merged.filter(e => e.realizedPL < 0).length;
 
+    const meta = extractFileMetadata(req.file.path, 'realized_pnl');
+    if (!data.source_metadata) data.source_metadata = {};
+    data.source_metadata.realized_pnl = meta;
     data.realized_pnl = { entries: merged, totalRealizedPL, totalBuyValue, totalSellValue, winners, losers };
     db.write(data);
     db.setTimestamp('realized_pnl');
 
     const diff = { symbols: parsed.entries.length, totalRealizedPL: parsed.totalRealizedPL };
-    db.addUploadHistory({ source: 'realized_pnl', filename: req.file.originalname || req.file.filename, changes: diff });
-    try { require('fs').unlinkSync(req.file.path); } catch {}
-    res.json({ success: true, diff, totalRealizedPL, winners, losers, totalSymbols: merged.length });
+    db.addUploadHistory({ source: 'realized_pnl', filename: req.file.originalname, changes: diff });
+    // File saved to data_sources/ — no unlink
+    res.json({ success: true, diff, totalRealizedPL, winners, losers, totalSymbols: merged.length, meta });
   } catch (err) {
-    try { require('fs').unlinkSync(req.file.path); } catch {}
     res.status(500).json({ error: err.message });
   }
 });

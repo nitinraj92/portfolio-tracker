@@ -7,6 +7,7 @@ const DB_PATH = process.env.PORTFOLIO_PATH ||
 const DEFAULT = {
   lastUpdated: { zerodha: null, icici: null, mfcentral_nitin: null, mfcentral_indumati: null, prices: null, realized_pnl: null },
   realized_pnl: { entries: [], totalRealizedPL: 0, totalBuyValue: 0, totalSellValue: 0, winners: 0, losers: 0 },
+  source_metadata: { zerodha: null, icici: null, mfcentral_nitin: null, mfcentral_indumati: null, realized_pnl: null },
   stocks: [], etfs: [], mf_nitin: [], mf_indumati: [],
   mf_scheme_codes: {}, price_history_cache: {}, upload_history: [],
   sips: { mf: [], etf_zerodha: [], etf_icici: [] },
