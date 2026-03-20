@@ -393,6 +393,16 @@ function renderETFs() {
 }
 
 // ── MF Tab ────────────────────────────────────────────────────────────────
+// Strip verbose historical name notes from MF scheme display names
+function cleanSchemeName(name) {
+  return name
+    .replace(/\s*\(erstwhile[^)]*\)/gi, '')
+    .replace(/\s*\(formerly[^)]*\)/gi, '')
+    .replace(/\s*\(Erstwhile[^)]*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function renderMF() {
   if (!portfolio) return;
   const { mf_nitin = [], mf_indumati = [], sips = {}, summary } = portfolio;
@@ -455,7 +465,7 @@ function renderMF() {
       const hPL    = hVal - h.invested;
       const sipInfo= findSIP(h.scheme||'');
       return '<tr>'
-        + '<td style="max-width:220px"><div class="ticker-name" style="font-size:12px">' + sanitize(h.scheme||'') + '</div></td>'
+        + '<td style="max-width:220px"><div class="ticker-name" style="font-size:12px">' + sanitize(cleanSchemeName(h.scheme||'')) + '</div></td>'
         + '<td><span style="font-size:11px;color:#64748b">' + sanitize(h.plan||'') + '</span></td>'
         + '<td>' + (h.units||0).toFixed(3) + '</td>'
         + '<td>' + fmt(h.invested) + '</td>'
