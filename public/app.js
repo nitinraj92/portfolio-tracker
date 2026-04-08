@@ -91,6 +91,12 @@ function luBadge(iso, id) {
 
 // ── Tab switching ───────────────────────────────────────────────────────
 let activeTab = 'stocks';
+let mfActiveTab = 'nitin';
+
+function switchMFTab(holder) {
+  mfActiveTab = holder;
+  renderMF();
+}
 
 function switchTab(tab) {
   activeTab = tab;
@@ -415,29 +421,27 @@ function renderMF() {
   if (!portfolio) return;
   const { mf_nitin = [], mf_indumati = [], sips = {}, summary } = portfolio;
 
-  const nitinInv  = mf_nitin.reduce((s,h) => s+h.invested, 0);
-  const nitinVal  = mf_nitin.reduce((s,h) => s+(h.currentValue||(h.nav||0)*h.units||0), 0);
-  const nitinToday= mf_nitin.reduce((s,h) => s+(h.todayPL||0), 0);
-  const induInv   = mf_indumati.reduce((s,h) => s+h.invested, 0);
-  const induVal   = mf_indumati.reduce((s,h) => s+(h.currentValue||(h.nav||0)*h.units||0), 0);
-  const induToday = mf_indumati.reduce((s,h) => s+(h.todayPL||0), 0);
-  const totalInv  = nitinInv + induInv;
-  const totalVal  = nitinVal + induVal;
-  const totalPL   = totalVal - totalInv;
-  const totalToday= nitinToday + induToday;
-  const mfSIPTotal= (sips.mf||[]).filter(s=>s.status==='active').reduce((a,s)=>a+s.amount,0);
-
+  const nitinInv   = mf_nitin.reduce((s,h) => s+h.invested, 0);
+  const nitinVal   = mf_nitin.reduce((s,h) => s+(h.currentValue||(h.nav||0)*h.units||0), 0);
+  const nitinToday = mf_nitin.reduce((s,h) => s+(h.todayPL||0), 0);
+  const induInv    = mf_indumati.reduce((s,h) => s+h.invested, 0);
+  const induVal    = mf_indumati.reduce((s,h) => s+(h.currentValue||(h.nav||0)*h.units||0), 0);
+  const induToday  = mf_indumati.reduce((s,h) => s+(h.todayPL||0), 0);
+  const totalInv   = nitinInv + induInv;
+  const totalVal   = nitinVal + induVal;
+  const totalPL    = totalVal - totalInv;
+  const totalToday = nitinToday + induToday;
+  const mfSIPTotal = (sips.mf||[]).filter(s=>s.status==='active').reduce((a,s)=>a+s.amount,0);
   const combinedXIRR = summary?.segments?.mf_combined?.xirr;
+
   document.getElementById('mf-summary').innerHTML =
     '<span>Invested: <strong>' + fmt(totalInv) + '</strong></span>' +
     '<span>Value: <strong>' + fmt(totalVal) + '</strong></span>' +
-    '<span class="' + plCls(totalPL) + '">P&amp;L: <strong>' + sign(totalPL) + fmt(totalPL) + ' (' + fmtPct(totalInv?totalPL/totalInv*100:0) + ')</strong></span>' +
+    '<span class="' + plCls(totalPL) + '">P&L: <strong>' + sign(totalPL) + fmt(totalPL) + ' (' + fmtPct(totalInv?totalPL/totalInv*100:0) + ')</strong></span>' +
     '<span class="' + plCls(totalToday) + '">Today: <strong>' + sign(totalToday) + fmt(totalToday) + '</strong></span>' +
     '<span>MF SIPs: <strong>' + fmt(mfSIPTotal) + '/mo</strong></span>' +
     (combinedXIRR != null ? '<span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:8px;font-size:11px">Combined XIRR <strong>' + combinedXIRR.toFixed(1) + '%</strong></span>' : '');
 
-  // Build SIP lookup from settings — keyed by scheme name
-  // Match by extracting key fund words (ignore plan/growth/regular/direct suffixes)
   function normScheme(s) {
     return (s||'').toLowerCase()
       .replace(/direct\s+plan/g,'').replace(/regular\s+plan/g,'')
@@ -445,36 +449,50 @@ function renderMF() {
       .replace(/\(erstwhile[^)]*\)/g,'').replace(/\(formerly[^)]*\)/g,'')
       .replace(/\s{2,}/g,' ').trim().substring(0, 30);
   }
-  const sipMap = {};
-  (sips.mf||[]).forEach(s => { sipMap[normScheme(s.scheme)] = s; });
-  const findSIP = scheme => {
+  function buildSipMap(holder) {
+    const map = {};
+    (sips.mf||[]).filter(s => s.holder === holder).forEach(s => { map[normScheme(s.scheme)] = s; });
+    return map;
+  }
+  function findSIP(scheme, sipMap) {
     const norm = normScheme(scheme);
-    // Exact norm match first
     if (sipMap[norm]) return sipMap[norm];
-    // Partial match: longest common key
     let best = null, bestLen = 0;
     Object.entries(sipMap).forEach(([k, v]) => {
       const overlap = norm.includes(k) || k.includes(norm.substring(0, Math.min(norm.length, 20)));
       if (overlap && k.length > bestLen) { best = v; bestLen = k.length; }
     });
     return best;
+  }
+
+  const holderData = {
+    nitin:    { holdings: mf_nitin,    inv: nitinInv, val: nitinVal, today: nitinToday },
+    indumati: { holdings: mf_indumati, inv: induInv,  val: induVal,  today: induToday  },
   };
 
-  function buildSection(holdings, holder) {
-    const segsData = summary?.segments || {};
-    const xirr  = segsData['mf_' + holder]?.xirr;
-    const inv   = holdings.reduce((s,h)=>s+h.invested,0);
-    const val   = holdings.reduce((s,h)=>s+(h.currentValue||(h.nav||0)*h.units||0),0);
-    const pl    = val - inv;
-    const today = holdings.reduce((s,h)=>s+(h.todayPL||0),0);
-    const label = holder === 'nitin' ? 'Nitin — Direct Plans' : 'Indumati — via Dezerv';
-    const rows  = holdings.map(h => {
-      const hVal   = h.currentValue || (h.nav||0)*h.units || 0;
-      const hPL    = hVal - h.invested;
-      const sipInfo= findSIP(h.scheme||'');
+  function buildTabBar() {
+    return Object.entries(holderData).map(([h, d]) => {
+      const xirr     = summary?.segments?.['mf_' + h]?.xirr;
+      const isActive = mfActiveTab === h;
+      const label    = h === 'nitin' ? 'Nitin' : 'Indumati';
+      return '<button class="mf-tab-btn ' + h + (isActive ? ' active' : '') + '" onclick="switchMFTab(\'' + h + '\')">'
+        + sanitize(label)
+        + ' <span class="mf-tab-meta">' + fmt(d.val)
+        + (xirr != null ? ' &middot; XIRR ' + xirr.toFixed(1) + '%' : '')
+        + '</span></button>';
+    }).join('');
+  }
+
+  function buildTabContent(holder) {
+    const d      = holderData[holder];
+    const pl     = d.val - d.inv;
+    const sipMap = buildSipMap(holder);
+    const rows   = d.holdings.map(h => {
+      const hVal    = h.currentValue || (h.nav||0)*h.units || 0;
+      const hPL     = hVal - h.invested;
+      const sipInfo = findSIP(h.scheme||'', sipMap);
       return '<tr>'
         + '<td style="max-width:220px"><div class="ticker-name" style="font-size:12px">' + sanitize(cleanSchemeName(h.scheme||'')) + '</div></td>'
-        + '<td><span style="font-size:11px;color:#64748b">' + sanitize(h.plan||'') + '</span></td>'
         + '<td>' + (h.units||0).toFixed(3) + '</td>'
         + '<td>' + fmt(h.invested) + '</td>'
         + '<td>' + (h.nav ? h.nav.toFixed(4) : '—') + '</td>'
@@ -484,35 +502,35 @@ function renderMF() {
         + '<td>' + (sipInfo ? '<span class="sip-tag ' + holder + '">' + fmt(sipInfo.amount) + '</span>' : '—') + '</td>'
         + '</tr>';
     }).join('');
-    return '<div class="mf-section">'
-      + '<div class="mf-section-header">'
-      + '<div class="mf-section-title ' + holder + '">' + sanitize(label)
-      + (xirr != null ? '<span class="mf-xirr ' + holder + '">XIRR ' + xirr.toFixed(1) + '%</span>' : '')
+
+    return '<div class="mf-holder-stats">'
+      + '<span>Invested: <strong>' + fmt(d.inv) + '</strong></span>'
+      + '<span>Value: <strong class="' + plCls(pl) + '">' + fmt(d.val) + '</strong></span>'
+      + '<span class="' + plCls(pl) + '">P&L: <strong>' + sign(pl) + fmt(pl) + ' (' + fmtPct(d.inv ? pl/d.inv*100 : 0) + ')</strong></span>'
+      + '<span class="' + plCls(d.today) + '">Today: <strong>' + sign(d.today) + fmt(d.today) + '</strong></span>'
       + '</div>'
-      + '<div class="mf-section-stats">Invested: ' + fmt(inv)
-      + ' · Value: <strong class="' + plCls(pl) + '">' + fmt(val) + '</strong>'
-      + ' · P&amp;L: <strong class="' + plCls(pl) + '">' + sign(pl) + fmt(pl) + ' (' + fmtPct(inv?pl/inv*100:0) + ')</strong>'
-      + ' · Today: <strong class="' + plCls(today) + '">' + sign(today) + fmt(today) + '</strong>'
-      + '</div></div>'
       + '<div class="table-wrap"><table class="data-table"><thead><tr>'
-      + '<th>SCHEME</th><th>PLAN</th><th>UNITS</th><th>INVESTED</th>'
-      + '<th>NAV <span class="live-dot">●</span></th>'
-      + '<th>VALUE</th><th>TOTAL P&amp;L</th><th>TODAY</th><th>SIP</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '<th>SCHEME</th><th>UNITS</th><th>INVESTED</th>'
+      + '<th>NAV <span class="live-dot">&#9679;</span></th>'
+      + '<th>VALUE</th><th>TOTAL P&L</th><th>TODAY</th><th>SIP</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
-  document.getElementById('mf-content').innerHTML = buildSection(mf_nitin,'nitin') + buildSection(mf_indumati,'indumati');
+
+  document.getElementById('mf-content').innerHTML =
+    '<div class="mf-tab-bar">' + buildTabBar() + '</div>'
+    + '<div class="mf-tab-content">' + buildTabContent(mfActiveTab) + '</div>';
 }
 
 // ── Data Sources Tab ──────────────────────────────────────────────────────
 // SOURCE_CONFIG split into two groups for display
 const SOURCE_STOCKS_ETFS = [
-  { id:'zerodha',      title:'Zerodha — Holdings',   iconLabel:'Z',   iconCls:'zerodha', endpoint:'/api/upload/zerodha',       accept:'.xlsx',      hint:'Console → Reports → Holdings → Export XLSX' },
-  { id:'icici',        title:'ICICI Direct',         iconLabel:'IC',  iconCls:'icici',   endpoint:'/api/upload/icici',         accept:'.csv',       hint:'Portfolio → Portfolio Summary → Export' },
-  { id:'realized_pnl', title:'Zerodha — Realized P&L', iconLabel:'P&L', iconCls:'zerodha', endpoint:'/api/upload/realized-pnl', accept:'.xlsx',      hint:'Console → Reports → Tax P&L → Download XLSX · Multiple files merge automatically' },
+  { id:'zerodha',      title:'Zerodha — Holdings',   iconLabel:'Z',   iconCls:'zerodha', endpoint:'/api/upload/zerodha',       accept:'.xlsx',      hint:'Console → Reports → Holdings → Export XLSX · Upload format: <strong>XLSX</strong>' },
+  { id:'icici',        title:'ICICI Direct',         iconLabel:'IC',  iconCls:'icici',   endpoint:'/api/upload/icici',         accept:'.csv',       hint:'Portfolio → Portfolio Summary → Export · Upload format: <strong>CSV</strong>' },
+  { id:'realized_pnl', title:'Zerodha — Realized P&L', iconLabel:'P&L', iconCls:'zerodha', endpoint:'/api/upload/realized-pnl', accept:'.xlsx',      hint:'Console → Reports → Tax P&L → Download XLSX · Multiple files merge automatically · Upload format: <strong>XLSX</strong>' },
 ];
 const SOURCE_MF = [
-  { id:'mfcentral_nitin',    title:'MFCentral — Nitin',    iconLabel:'MF', iconCls:'nitin', endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx', hint:'mfcentral.in → CAS → Detailed → Download' },
-  { id:'mfcentral_indumati', title:'MFCentral — Indumati', iconLabel:'MF', iconCls:'indu',  endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx', hint:'mfcentral.in → CAS → Detailed → Download' },
+  { id:'mfcentral_nitin',    title:'MFCentral — Nitin',    iconLabel:'MF', iconCls:'nitin', endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx', hint:'mfcentral.in → CAS → Detailed → Download · Upload format: <strong>XLSX or CSV</strong>' },
+  { id:'mfcentral_indumati', title:'MFCentral — Indumati', iconLabel:'MF', iconCls:'indu',  endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx', hint:'mfcentral.in → CAS → Detailed → Download · Upload format: <strong>XLSX or CSV</strong>' },
 ];
 const SOURCE_CONFIG = [...SOURCE_STOCKS_ETFS, ...SOURCE_MF];
 
@@ -537,7 +555,7 @@ function renderSources() {
       const nextDate = ts ? new Date(ts).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' }) : 'Never';
       hintHtml = '📅 Next CAS from: <strong>' + sanitize(nextDate) + '</strong>';
     } else {
-      hintHtml = '📥 ' + sanitize(src.hint);
+      hintHtml = '📥 ' + src.hint;
     }
 
     // For MFCentral, also show date range if available
@@ -838,10 +856,17 @@ function addMFSIP(holder) {
   document.getElementById('settings-mf-sips').scrollIntoView({ behavior: 'smooth' });
 }
 
+// Persist in-memory settings to server and refresh portfolio — no alert, no DOM read
+async function persistSettings() {
+  await api('POST', '/api/settings', settings);
+  await loadPortfolio();
+}
+
 function deleteMFSIP(idx) {
   if (!confirm('Remove this SIP?')) return;
   settings.sips.mf.splice(idx, 1);
   renderSettings();
+  persistSettings();
 }
 
 function toggleMFSIPStatus(idx) {
@@ -849,18 +874,21 @@ function toggleMFSIPStatus(idx) {
   if (!s) return;
   s.status = s.status === 'active' ? 'paused' : 'active';
   renderSettings();
+  persistSettings();
 }
 
 function addETFSIP(type) {
   const defaultMode = type === 'etf_zerodha' ? 'qty' : 'amount';
   settings.sips[type].push({ symbol: 'NEWSYMBOL', qty: defaultMode === 'qty' ? 10 : null, amount: defaultMode === 'amount' ? 1000 : null, date: 2, mode: defaultMode, status: 'active', start_date: new Date().toISOString().slice(0,10) });
   renderSettings();
+  persistSettings();
 }
 
 function deleteETFSIP(type, idx) {
   if (!confirm('Remove this ETF SIP?')) return;
   settings.sips[type].splice(idx, 1);
   renderSettings();
+  persistSettings();
 }
 
 function toggleETFSIPStatus(type, idx) {
@@ -868,6 +896,7 @@ function toggleETFSIPStatus(type, idx) {
   if (!s) return;
   s.status = s.status === 'active' ? 'paused' : 'active';
   renderSettings();
+  persistSettings();
 }
 
 async function saveSettings() {
@@ -894,8 +923,7 @@ async function saveSettings() {
     stocksCagr:         parseFloat((document.getElementById('set-stocks-cagr')||{}).value) || 15,
     monthlyStockBudget: parseFloat((document.getElementById('set-stock-budget')||{}).value) || 4000,
   };
-  await api('POST', '/api/settings', settings);
-  await loadPortfolio();
+  await persistSettings();
   alert('Settings saved!');
 }
 

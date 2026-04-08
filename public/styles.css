@@ -140,18 +140,21 @@ select { font-size: 11px; border: 1px solid var(--border); border-radius: 4px; p
 .thesis-holding { background: #f1f5f9; color: var(--text-dim); }
 
 /* MF sections */
-.mf-section { margin-bottom: 2px; background: white; }
-.mf-section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; padding: 12px 20px; border-bottom: 1px solid var(--border); gap: 6px; }
-.mf-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
-.mf-section-title.nitin { color: var(--purple); }
-.mf-section-title.indu { color: var(--violet); }
+.mf-tab-bar { display: flex; gap: 0; border-bottom: 2px solid var(--border); padding: 0 20px; background: white; }
+.mf-tab-btn { padding: 10px 18px; font-size: 12px; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.mf-tab-btn:hover { color: #1e293b; }
+.mf-tab-btn.nitin.active { color: var(--purple); border-bottom-color: var(--purple); }
+.mf-tab-btn.indumati.active { color: var(--violet); border-bottom-color: var(--violet); }
+.mf-tab-meta { font-size: 10px; font-weight: 400; color: #94a3b8; }
+.mf-tab-content { background: white; }
+.mf-holder-stats { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 20px; font-size: 11px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+.mf-holder-stats strong { color: var(--text); }
 .mf-xirr { font-size: 10px; padding: 2px 7px; border-radius: 8px; }
 .mf-xirr.nitin { background: #ede9fe; color: #5b21b6; }
-.mf-xirr.indu { background: #f5f3ff; color: #7c3aed; }
-.mf-section-stats { font-size: 11px; color: var(--text-dim); }
+.mf-xirr.indumati { background: #f5f3ff; color: #7c3aed; }
 .sip-tag { font-size: 10px; padding: 2px 6px; border-radius: 6px; }
 .sip-tag.nitin { background: #ede9fe; color: #5b21b6; }
-.sip-tag.indu { background: #f5f3ff; color: #7c3aed; }
+.sip-tag.indumati { background: #f5f3ff; color: #7c3aed; }
 
 /* Source cards */
 .source-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 20px; }
@@ -315,9 +318,10 @@ input[type="file"].hidden { display: none; }
   .tech-grid { flex-direction: column; gap: 12px; }
   .tech-section { min-width: 0; }
 
-  /* MF section */
-  .mf-section-header { flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; }
-  .mf-section-stats { font-size: 10px; }
+  /* MF tabs */
+  .mf-tab-bar { padding: 0 12px; }
+  .mf-tab-btn { padding: 8px 12px; font-size: 11px; }
+  .mf-holder-stats { padding: 8px 12px; gap: 10px; font-size: 10px; }
 
   /* Source cards: single column */
   .source-cards { grid-template-columns: 1fr; padding: 12px; gap: 10px; }
