@@ -766,11 +766,11 @@ function renderSettings() {
       const idx = mfSIPs.indexOf(s);
       const isActive = s.status === 'active';
       return '<tr>'
-        + '<td style="font-size:11px;max-width:240px"><input style="width:100%;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:3px 6px" data-type="mf" data-field="scheme" data-idx="' + idx + '" value="' + sanitize(s.scheme||'') + '"></td>'
+        + '<td style="min-width:180px"><input style="width:100%;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;box-sizing:border-box" data-type="mf" data-field="scheme" data-idx="' + idx + '" value="' + sanitize(s.scheme||'') + '"></td>'
         + '<td><input class="settings-input" data-type="mf" data-field="amount" data-idx="' + idx + '" type="number" value="' + s.amount + '"></td>'
         + '<td>' + dateSelect(s.date, idx) + '</td>'
-        + '<td><button class="btn-secondary" style="font-size:10px;padding:3px 8px" onclick="toggleMFSIPStatus(' + idx + ')">' + (isActive ? '⏸ Pause' : '▶ Resume') + '</button></td>'
-        + '<td><button class="del-btn" onclick="deleteMFSIP(' + idx + ')">✕</button></td>'
+        + '<td><button class="btn-sip-status ' + (isActive ? 'active' : 'paused') + '" onclick="toggleMFSIPStatus(' + idx + ')">' + (isActive ? '⏸ Pause' : '▶ Resume') + '</button></td>'
+        + '<td><button class="del-btn" onclick="deleteMFSIP(' + idx + ')">✕ Remove</button></td>'
         + '</tr>';
     }).join('');
   }
@@ -780,12 +780,12 @@ function renderSettings() {
     + '<div class="settings-section-title nitin" style="margin:0">Nitin — Direct Plans</div>'
     + '<button class="btn-primary" style="font-size:11px;padding:4px 10px" onclick="addMFSIP(\'nitin\')">+ Add SIP</button>'
     + '</div>'
-    + '<table class="settings-table"><thead><tr><th>Scheme</th><th>Amount (₹)</th><th>Date</th><th></th><th></th></tr></thead><tbody>' + mfRows(mfNitin, 'nitin') + '</tbody></table>'
+    + '<table class="settings-table"><thead><tr><th>Scheme</th><th>Amount (₹)</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>' + mfRows(mfNitin, 'nitin') + '</tbody></table>'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 6px">'
     + '<div class="settings-section-title indu" style="margin:0">Indumati — via Dezerv</div>'
     + '<button class="btn-primary" style="font-size:11px;padding:4px 10px;background:var(--violet)" onclick="addMFSIP(\'indumati\')">+ Add SIP</button>'
     + '</div>'
-    + '<table class="settings-table"><thead><tr><th>Scheme</th><th>Amount (₹)</th><th>Date</th><th></th><th></th></tr></thead><tbody>' + mfRows(mfIndu, 'indumati') + '</tbody></table>'
+    + '<table class="settings-table"><thead><tr><th>Scheme</th><th>Amount (₹)</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>' + mfRows(mfIndu, 'indumati') + '</tbody></table>'
     + '<div class="settings-total">'
     + '<span>Nitin: <strong style="color:var(--purple)">' + fmt(nitinTotal) + '/mo</strong></span>'
     + '<span>Indumati: <strong style="color:var(--violet)">' + fmt(induTotal) + '/mo</strong></span>'
@@ -818,8 +818,8 @@ function renderSettings() {
         + '<td>' + valField + '</td>'
         + '<td>' + modeSel(m, type, i) + '</td>'
         + '<td>' + etfDateSel(s.date||2, type, i) + '</td>'
-        + '<td><button class="btn-secondary" style="font-size:10px;padding:3px 8px" onclick="toggleETFSIPStatus(\'' + type + '\',' + i + ')">' + (isActive ? '⏸ Pause' : '▶ Resume') + '</button></td>'
-        + '<td><button class="del-btn" onclick="deleteETFSIP(\'' + type + '\',' + i + ')">✕</button></td>'
+        + '<td><button class="btn-sip-status ' + (isActive ? 'active' : 'paused') + '" onclick="toggleETFSIPStatus(\'' + type + '\',' + i + ')">' + (isActive ? '⏸ Pause' : '▶ Resume') + '</button></td>'
+        + '<td><button class="del-btn" onclick="deleteETFSIP(\'' + type + '\',' + i + ')">✕ Remove</button></td>'
         + '</tr>';
     }).join('');
   }
@@ -829,13 +829,13 @@ function renderSettings() {
     + '<div class="settings-section-title" style="color:#ff6600;margin:0">Zerodha Basket</div>'
     + '<button class="btn-primary" style="font-size:11px;padding:4px 10px;background:#ff6600" onclick="addETFSIP(\'etf_zerodha\')">+ Add ETF</button>'
     + '</div>'
-    + '<table class="settings-table"><thead><tr><th>ETF</th><th>Value/Month</th><th>Mode</th><th>Date</th><th></th><th></th></tr></thead><tbody>'
+    + '<table class="settings-table"><thead><tr><th>ETF</th><th>Value/Month</th><th>Mode</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>'
     + etfRows(etfZ, 'etf_zerodha') + '</tbody></table>'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 6px">'
     + '<div class="settings-section-title" style="color:var(--purple);margin:0">ICICI ETF SIPs</div>'
     + '<button class="btn-primary" style="font-size:11px;padding:4px 10px" onclick="addETFSIP(\'etf_icici\')">+ Add ETF</button>'
     + '</div>'
-    + '<table class="settings-table"><thead><tr><th>ETF</th><th>Value/Month</th><th>Mode</th><th>Date</th><th></th><th></th></tr></thead><tbody>'
+    + '<table class="settings-table"><thead><tr><th>ETF</th><th>Value/Month</th><th>Mode</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>'
     + etfRows(etfI, 'etf_icici') + '</tbody></table>'
     + '<div class="assump-note" style="margin-top:8px">Mode: "Units" = buy N units/month. "₹ Amount" = invest fixed amount/month.</div>';
 
@@ -849,15 +849,44 @@ function renderSettings() {
     + '<div class="assump-note">Changes update the Wealth Projection chart when saved.</div>';
 }
 
+// Read all visible input/select values back into settings — call before any renderSettings() or persist
+function syncDOMToSettings() {
+  if (!settings) return;
+  document.querySelectorAll('[data-type="mf"][data-field]').forEach(el => {
+    const idx = parseInt(el.dataset.idx), field = el.dataset.field;
+    if (isNaN(idx) || !settings.sips.mf[idx]) return;
+    if (field === 'scheme') settings.sips.mf[idx][field] = el.value.trim();
+    else if (field === 'amount') settings.sips.mf[idx][field] = parseFloat(el.value) || 0;
+    else settings.sips.mf[idx][field] = parseInt(el.value) || 0;
+  });
+  ['etf_zerodha', 'etf_icici'].forEach(type => {
+    document.querySelectorAll('[data-type="' + type + '"]').forEach(el => {
+      const idx = parseInt(el.dataset.idx), field = el.dataset.field;
+      if (isNaN(idx) || !settings.sips[type][idx]) return;
+      if (field === 'symbol') settings.sips[type][idx][field] = el.value.trim().toUpperCase();
+      else if (field === 'mode') settings.sips[type][idx][field] = el.value;
+      else if (field === 'date') settings.sips[type][idx][field] = parseInt(el.value) || 1;
+      else settings.sips[type][idx][field] = parseFloat(el.value) || 0;
+    });
+  });
+  const mfCagr = document.getElementById('set-mf-cagr');
+  if (mfCagr) settings.assumptions = {
+    mfEtfCagr:          parseFloat(mfCagr.value) || 12,
+    stocksCagr:         parseFloat((document.getElementById('set-stocks-cagr')||{}).value) || 15,
+    monthlyStockBudget: parseFloat((document.getElementById('set-stock-budget')||{}).value) || 4000,
+  };
+}
+
 function addMFSIP(holder) {
+  syncDOMToSettings(); // preserve any typed values before re-render
   settings.sips.mf.push({ scheme: 'New Scheme', amount: 1000, date: 2, holder, status: 'active', start_date: new Date().toISOString().slice(0,10) });
   renderSettings();
-  // Scroll to the new row
   document.getElementById('settings-mf-sips').scrollIntoView({ behavior: 'smooth' });
 }
 
-// Persist in-memory settings to server and refresh portfolio — no alert, no DOM read
+// Persist in-memory settings to server and refresh portfolio — no alert
 async function persistSettings() {
+  syncDOMToSettings(); // always capture latest DOM state before saving
   await api('POST', '/api/settings', settings);
   await loadPortfolio();
 }
@@ -900,30 +929,7 @@ function toggleETFSIPStatus(type, idx) {
 }
 
 async function saveSettings() {
-  document.querySelectorAll('[data-type="mf"][data-field]').forEach(el => {
-    const idx = parseInt(el.dataset.idx), field = el.dataset.field;
-    if (isNaN(idx) || !settings.sips.mf[idx]) return;
-    if (field === 'scheme') settings.sips.mf[idx][field] = el.value.trim();
-    else if (field === 'amount') settings.sips.mf[idx][field] = parseFloat(el.value);
-    else settings.sips.mf[idx][field] = parseInt(el.value);
-  });
-  ['etf_zerodha','etf_icici'].forEach(type => {
-    document.querySelectorAll('[data-type="' + type + '"]').forEach(el => {
-      const idx = parseInt(el.dataset.idx), field = el.dataset.field;
-      if (isNaN(idx) || !settings.sips[type][idx]) return;
-      if (field === 'symbol') settings.sips[type][idx][field] = el.value.trim().toUpperCase();
-      else if (field === 'mode') settings.sips[type][idx][field] = el.value;
-      else if (field === 'date') settings.sips[type][idx][field] = parseInt(el.value);
-      else settings.sips[type][idx][field] = parseFloat(el.value);
-    });
-  });
-  const mfCagr = document.getElementById('set-mf-cagr');
-  if (mfCagr) settings.assumptions = {
-    mfEtfCagr:          parseFloat(mfCagr.value) || 12,
-    stocksCagr:         parseFloat((document.getElementById('set-stocks-cagr')||{}).value) || 15,
-    monthlyStockBudget: parseFloat((document.getElementById('set-stock-budget')||{}).value) || 4000,
-  };
-  await persistSettings();
+  await persistSettings(); // syncDOMToSettings() is called inside persistSettings()
   alert('Settings saved!');
 }
 
