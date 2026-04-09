@@ -28,7 +28,12 @@ if (!require('fs').existsSync(DATA_SOURCES_DIR)) require('fs').mkdirSync(DATA_SO
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, DATA_SOURCES_DIR),
-    filename:    (req, file, cb) => cb(null, file.originalname),
+    filename:    (req, file, cb) => {
+      const ext  = path.extname(file.originalname);
+      const base = path.basename(file.originalname, ext);
+      const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      cb(null, base + '_' + ts + ext);
+    },
   })
 });
 
@@ -241,20 +246,82 @@ app.post('/api/upload/mfcentral', upload.single('file'), (req, res) => {
     const meta = extractFileMetadata(req.file.path, 'mfcentral');
     const data = db.read();
     if (!data.source_metadata) data.source_metadata = {};
-    if (holder === 'nitin') {
-      data.mf_nitin = holdings;
-      data.source_metadata.mfcentral_nitin = meta;
-      db.write(data);
-      db.setTimestamp('mfcentral_nitin');
-    } else if (holder === 'indumati') {
-      data.mf_indumati = holdings;
-      data.source_metadata.mfcentral_indumati = meta;
-      db.write(data);
-      db.setTimestamp('mfcentral_indumati');
-    } else {
-      return res.status(400).json({ error: 'Could not detect holder from PAN in file' });
+
+    const mfKey = holder === 'nitin' ? 'mf_nitin' : holder === 'indumati' ? 'mf_indumati' : null;
+    if (!mfKey) return res.status(400).json({ error: 'Could not detect holder from PAN in file' });
+
+    const r            = (n) => Math.round(n * 100) / 100;
+    const prevHoldings = data[mfKey] || [];
+    const prevMap      = Object.fromEntries(prevHoldings.map(h => [h.scheme, h]));
+    const newMap       = Object.fromEntries(holdings.map(h => [h.scheme, h]));
+
+    // Collect sell events: full sells (scheme gone) + partial sells (units & invested decreased)
+    const sellEvents = [];
+
+    prevHoldings.filter(h => !newMap[h.scheme]).forEach(prev => {
+      sellEvents.push({
+        key: prev.scheme, units: prev.units,
+        buyValue:  r(prev.invested     || 0),
+        sellValue: r(prev.currentValue || 0),
+      });
+    });
+
+    holdings.forEach(nw => {
+      const prev = prevMap[nw.scheme];
+      if (!prev) return;
+      if (nw.units < prev.units && nw.invested < prev.invested) {
+        const soldUnits  = prev.units - nw.units;
+        const proportion = soldUnits / prev.units;
+        sellEvents.push({
+          key: prev.scheme, units: soldUnits,
+          buyValue:  r(prev.invested - nw.invested),
+          sellValue: r((prev.currentValue || 0) * proportion),
+        });
+      }
+    });
+
+    if (sellEvents.length > 0) {
+      const existing    = data.realized_pnl?.entries || [];
+      const existingMap = Object.fromEntries(existing.map(e => [e.symbol, e]));
+
+      sellEvents.forEach(({ key, units, buyValue, sellValue }) => {
+        const pl    = r(sellValue - buyValue);
+        const plPct = buyValue > 0 ? r((pl / buyValue) * 100) : 0;
+        if (existingMap[key]) {
+          existingMap[key].buyValue   = r(existingMap[key].buyValue   + buyValue);
+          existingMap[key].sellValue  = r(existingMap[key].sellValue  + sellValue);
+          existingMap[key].realizedPL = r(existingMap[key].realizedPL + pl);
+          existingMap[key].qty        = r((existingMap[key].qty || 0) + units);
+          existingMap[key].openQty    = newMap[key] ? (newMap[key].units || 0) : 0;
+        } else {
+          existingMap[key] = { symbol: key, isin: '', qty: units,
+            buyValue, sellValue, realizedPL: pl, realizedPct: plPct,
+            openQty: newMap[key] ? (newMap[key].units || 0) : 0, source: 'mf' };
+        }
+      });
+
+      const merged      = Object.values(existingMap);
+      data.realized_pnl = {
+        entries:         merged,
+        totalRealizedPL: r(merged.reduce((s, e) => s + e.realizedPL, 0)),
+        totalBuyValue:   r(merged.reduce((s, e) => s + e.buyValue,   0)),
+        totalSellValue:  r(merged.reduce((s, e) => s + e.sellValue,  0)),
+        winners:         merged.filter(e => e.realizedPL > 0).length,
+        losers:          merged.filter(e => e.realizedPL < 0).length,
+      };
     }
-    const diff = { holder, updated: holdings.length };
+
+    data[mfKey] = holdings;
+    data.source_metadata['mfcentral_' + holder] = meta;
+    db.write(data);
+    db.setTimestamp('mfcentral_' + holder);
+
+    const fullSold    = prevHoldings.filter(h => !newMap[h.scheme]).length;
+    const partialSold = holdings.filter(nw => {
+      const prev = prevMap[nw.scheme];
+      return prev && nw.units < prev.units && nw.invested < prev.invested;
+    }).length;
+    const diff = { holder, updated: holdings.length, fullSold, partialSold };
     db.addUploadHistory({ source: 'mfcentral_' + holder, filename: req.file.originalname, changes: diff });
     res.json({ success: true, diff, meta });
   } catch (err) {
@@ -338,12 +405,20 @@ app.post('/api/upload/realized-pnl', upload.single('file'), (req, res) => {
         existingMap[e.symbol].buyValue  = Math.round((existingMap[e.symbol].buyValue  + e.buyValue)  * 100) / 100;
         existingMap[e.symbol].sellValue = Math.round((existingMap[e.symbol].sellValue + e.sellValue) * 100) / 100;
         existingMap[e.symbol].realizedPL = Math.round((existingMap[e.symbol].realizedPL + e.realizedPL) * 100) / 100;
+        existingMap[e.symbol].openQty = e.openQty; // latest upload is authoritative
       } else {
         existingMap[e.symbol] = { ...e };
       }
     });
 
     const merged = Object.values(existingMap);
+
+    // Remove fully-sold positions (openQty === 0) from live holdings
+    const fullySold = new Set(merged.filter(e => e.openQty === 0).map(e => e.symbol));
+    if (fullySold.size > 0) {
+      data.etfs   = data.etfs.filter(e => !fullySold.has(e.symbol));
+      data.stocks = data.stocks.filter(s => !fullySold.has(s.symbol));
+    }
     const totalRealizedPL  = Math.round(merged.reduce((s, e) => s + e.realizedPL, 0) * 100) / 100;
     const totalBuyValue    = Math.round(merged.reduce((s, e) => s + e.buyValue, 0) * 100) / 100;
     const totalSellValue   = Math.round(merged.reduce((s, e) => s + e.sellValue, 0) * 100) / 100;
@@ -501,9 +576,29 @@ function scheduleRefresh() {
     if (!isMarketOpen()) return;
     console.log('[server] Auto-refreshing prices...');
     try {
+      // Snapshot used only for fetching prices — do NOT write this back
+      const snapshot = db.read();
+      const updatedStocks = await refreshPrices(snapshot.stocks);
+      const updatedEtfs   = await refreshPrices(snapshot.etfs);
+
+      // Re-read AFTER async ops so any uploads during the fetch aren't overwritten
       const data = db.read();
-      data.stocks = await refreshPrices(data.stocks);
-      data.etfs = await refreshPrices(data.etfs);
+      const stockMap = Object.fromEntries(updatedStocks.map(s => [s.symbol, s]));
+      const etfMap   = Object.fromEntries(updatedEtfs.map(e => [e.symbol, e]));
+
+      // Merge: base is fresh data, overlay only price-related fields
+      const PRICE_FIELDS = ['ltp','prevClose','todayPL','todayPLPct','rsi','health','trend',
+        'dma50','dma200','week52High','week52Low','pe','marketCap','eps','roe','netMargin',
+        'debtEquity','beta','bookValue','dividendYield','analystTarget','exchange'];
+      function applyPrices(holding, map) {
+        const updated = map[holding.symbol];
+        if (!updated) return holding;
+        const patch = {};
+        PRICE_FIELDS.forEach(f => { if (updated[f] !== undefined) patch[f] = updated[f]; });
+        return { ...holding, ...patch };
+      }
+      data.stocks = data.stocks.map(s => applyPrices(s, stockMap));
+      data.etfs   = data.etfs.map(e => applyPrices(e, etfMap));
       data.lastUpdated.prices = new Date().toISOString();
       db.write(data);
     } catch (err) {

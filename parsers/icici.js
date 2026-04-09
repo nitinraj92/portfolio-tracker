@@ -42,9 +42,10 @@ function parse(filePath) {
       const rawSymbol = String(normalizedRow['Stock Symbol']).trim();
       const symbol = SYMBOL_MAP[rawSymbol] || rawSymbol;
       const qty = Number(normalizedRow['Qty']) || 0;
-      const avgCost = Number(normalizedRow['Avg.Price']) || 0;
-      const ltp = Number(normalizedRow['LTP']) || 0;
-      const pctChange = Number(normalizedRow['% change over prev close']) || 0;
+      const avgCost = Number(normalizedRow['Avg.Price'] ?? normalizedRow['Average Cost Price']) || 0;
+      const ltp = Number(normalizedRow['LTP'] ?? normalizedRow['Current Market Price']) || 0;
+      const rawPct = normalizedRow['% change over prev close'] ?? normalizedRow['% Change over prev close'] ?? 0;
+      const pctChange = Number(String(rawPct).replace(/\s/g, '')) || 0;
       const prevClose = pctChange !== 0 ? ltp / (1 + pctChange / 100) : ltp;
       const todayPL = Math.round((ltp - prevClose) * qty * 100) / 100;
       const todayPLPct = Math.round(pctChange * 100) / 100;
