@@ -436,12 +436,6 @@ app.post('/api/upload/realized-pnl', upload.single('file'), (req, res) => {
 
     const merged = Object.values(existingMap);
 
-    // Remove fully-sold positions (openQty === 0) from live holdings
-    const fullySold = new Set(merged.filter(e => e.openQty === 0).map(e => e.symbol));
-    if (fullySold.size > 0) {
-      data.etfs   = data.etfs.filter(e => !fullySold.has(e.symbol));
-      data.stocks = data.stocks.filter(s => !fullySold.has(s.symbol));
-    }
     const totalRealizedPL  = Math.round(merged.reduce((s, e) => s + e.realizedPL, 0) * 100) / 100;
     const totalBuyValue    = Math.round(merged.reduce((s, e) => s + e.buyValue, 0) * 100) / 100;
     const totalSellValue   = Math.round(merged.reduce((s, e) => s + e.sellValue, 0) * 100) / 100;
