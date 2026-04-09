@@ -301,7 +301,7 @@ function renderStocks() {
       + '<span>🟢 ' + s.healthy + ' &nbsp;🟡 ' + s.neutral + ' &nbsp;🔴 ' + s.weak + '</span>';
   }
 
-  document.getElementById('stocks-summary').innerHTML = summaryHtml(calcSummary(primaryList));
+  document.getElementById('stocks-summary').innerHTML = summaryHtml(calcSummary([...primaryList, ...secondaryList]));
 
   const sortBy = (document.getElementById('stocks-sort') || {}).value || 'plPct';
   const filter = ((document.getElementById('stocks-filter') || {}).value || '').toLowerCase();
@@ -370,19 +370,22 @@ function renderStocks() {
   const primRows = filterAndSort(primaryList).map(h  => buildRow(h,  sanitize(h.symbol) + '-pri')).join('');
   const secRows  = filterAndSort(secondaryList).map(h => buildRow(h, sanitize(h.symbol) + '-sec')).join('');
 
-  const secSummary = calcSummary(secondaryList);
-  const secHeader = secondaryList.length > 0
-    ? '<tr><td colspan="10" style="padding:8px 10px;background:#f1f5f9;border-top:2px solid var(--border);border-bottom:1px solid var(--border)">'
-      + '<strong style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#475569">📦 Secondary Account</strong>'
+  function sectionHeader(label, emoji, list) {
+    const s = calcSummary(list);
+    return '<tr><td colspan="10" style="padding:8px 10px;background:#f1f5f9;border-top:2px solid var(--border);border-bottom:1px solid var(--border)">'
+      + '<strong style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#475569">' + emoji + ' ' + label + '</strong>'
       + '<span style="margin-left:12px;font-size:11px;color:#64748b">'
-      + 'Invested: ' + fmt(secSummary.inv) + ' &nbsp;&middot;&nbsp; '
-      + 'Value: ' + fmt(secSummary.val) + ' &nbsp;&middot;&nbsp; '
-      + '<span class="' + plCls(secSummary.pl) + '">P&amp;L: ' + sign(secSummary.pl) + fmt(secSummary.pl) + '</span>'
-      + ' &nbsp;&middot;&nbsp; <span class="' + plCls(secSummary.todayPL) + '">Today: ' + sign(secSummary.todayPL) + fmt(secSummary.todayPL) + '</span>'
-      + '</span></td></tr>'
-    : '';
+      + 'Invested: ' + fmt(s.inv) + ' &nbsp;·&nbsp; '
+      + 'Value: ' + fmt(s.val) + ' &nbsp;·&nbsp; '
+      + '<span class="' + plCls(s.pl) + '">P&L: ' + sign(s.pl) + fmt(s.pl) + '</span>'
+      + ' &nbsp;·&nbsp; <span class="' + plCls(s.todayPL) + '">Today: ' + sign(s.todayPL) + fmt(s.todayPL) + '</span>'
+      + '</span></td></tr>';
+  }
 
-  document.getElementById('stocks-tbody').innerHTML = primRows + secHeader + secRows;
+  const primHeader = primaryList.length > 0   ? sectionHeader('Primary Account',   '🏦', primaryList)   : '';
+  const secHeader  = secondaryList.length > 0  ? sectionHeader('Secondary Account', '📦', secondaryList) : '';
+
+  document.getElementById('stocks-tbody').innerHTML = primHeader + primRows + secHeader + secRows;
 }
 
 function toggleTechPanel(key) {
