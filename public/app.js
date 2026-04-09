@@ -15,6 +15,7 @@ let settings  = null;
 let wealthChart = null;
 let countdown = 60;
 let countdownTimer = null;
+let stockCategory = {};
 
 // ── API ────────────────────────────────────────────────────────────────
 async function api(method, path, body) {
@@ -33,6 +34,32 @@ async function loadPortfolio() {
 async function loadSettings() {
   settings = await api('GET', '/api/settings');
   if (activeTab === 'settings') renderSettings();
+}
+
+async function loadStockCategory() {
+  stockCategory = await api('GET', '/api/stock-category');
+}
+
+async function saveStockCategory() {
+  if (!portfolio) return;
+  const stocks = portfolio.stocks || [];
+  const newCategory = {};
+  stocks.forEach(h => {
+    const sym = h.symbol;
+    const pInput = document.querySelector('.sc-input[data-sym="' + sym + '"][data-field="primary"]');
+    const sInput = document.querySelector('.sc-input[data-sym="' + sym + '"][data-field="secondary"]');
+    newCategory[sym] = {
+      primary:   parseInt((pInput && pInput.value) || '0') || 0,
+      secondary: parseInt((sInput && sInput.value) || '0') || 0,
+    };
+  });
+  const r = await api('POST', '/api/stock-category', newCategory);
+  if (r.success) {
+    stockCategory = newCategory;
+    renderStocks();
+    const btn = document.getElementById('sc-save-btn');
+    if (btn) { btn.textContent = '✓ Saved'; setTimeout(() => { if (btn) btn.textContent = 'Save'; }, 1500); }
+  }
 }
 
 async function triggerRefresh() {
@@ -113,7 +140,10 @@ function renderActiveTab() {
   if (!portfolio) return;
   const map = { stocks: renderStocks, etfs: renderETFs, mf: renderMF, sources: renderSources, wealth: renderWealth };
   if (map[activeTab]) map[activeTab]();
-  if (activeTab === 'settings') { if (!settings) loadSettings(); else renderSettings(); }
+  if (activeTab === 'settings') {
+    if (!settings) loadSettings(); else renderSettings();
+    renderStockCategory();
+  }
 }
 
 // ── Dashboard ───────────────────────────────────────────────────────────
@@ -229,37 +259,67 @@ function renderStocks() {
   if (!portfolio) return;
   const stocks = portfolio.stocks || [];
 
-  const invested = stocks.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
-  const value    = stocks.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
-  const pl       = value - invested;
-  const todayPL  = stocks.reduce((s, h) => s + (h.todayPL || 0), 0);
-  const winners  = stocks.filter(h => (h.ltp || 0) > (h.avgCost || 0)).length;
-  const healthy  = stocks.filter(h => h.health === 'Healthy').length;
-  const neutral  = stocks.filter(h => h.health === 'Neutral' || !h.health).length;
-  const weak     = stocks.filter(h => h.health === 'Weak').length;
+  function getAccountQtys(h) {
+    return stockCategory[h.symbol] || { primary: h.qty, secondary: 0 };
+  }
 
-  document.getElementById('stocks-summary').innerHTML =
-    '<span>Invested: <strong>' + fmt(invested) + '</strong></span>' +
-    '<span>Value: <strong>' + fmt(value) + '</strong></span>' +
-    '<span class="' + plCls(pl) + '">P&amp;L: <strong>' + sign(pl) + fmt(pl) + '</strong></span>' +
-    '<span class="' + plCls(todayPL) + '">Today: <strong>' + sign(todayPL) + fmt(todayPL) + '</strong></span>' +
-    '<span>Winners: <strong style="color:var(--green)">' + winners + '</strong> / Losers: <strong style="color:var(--red)">' + (stocks.length - winners) + '</strong></span>' +
-    '<span>🟢 ' + healthy + ' &nbsp;🟡 ' + neutral + ' &nbsp;🔴 ' + weak + '</span>';
+  function withCalcs(h) {
+    const inv    = (h.avgCost || 0) * h.qty;
+    const val    = (h.ltp || 0) * h.qty;
+    const pl     = val - inv;
+    const plPct  = inv > 0 ? (pl / inv) * 100 : 0;
+    const todayPL = Math.round(((h.todayPLPct || 0) / 100) * (h.ltp || 0) * h.qty * 100) / 100;
+    return { ...h, plAbsolute: pl, plPct, todayPL };
+  }
+
+  const primaryList   = [];
+  const secondaryList = [];
+  stocks.forEach(h => {
+    const { primary, secondary } = getAccountQtys(h);
+    if (primary   > 0) primaryList.push(withCalcs({ ...h, qty: primary }));
+    if (secondary > 0) secondaryList.push(withCalcs({ ...h, qty: secondary }));
+  });
+
+  function calcSummary(list) {
+    const inv     = list.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
+    const val     = list.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
+    const pl      = val - inv;
+    const todayPL = list.reduce((s, h) => s + (h.todayPL || 0), 0);
+    const winners = list.filter(h => (h.ltp || 0) > (h.avgCost || 0)).length;
+    const healthy = list.filter(h => h.health === 'Healthy').length;
+    const neutral = list.filter(h => h.health === 'Neutral' || !h.health).length;
+    const weak    = list.filter(h => h.health === 'Weak').length;
+    return { inv, val, pl, todayPL, winners, healthy, neutral, weak, count: list.length };
+  }
+
+  function summaryHtml(s) {
+    return '<span>Invested: <strong>' + fmt(s.inv) + '</strong></span>'
+      + '<span>Value: <strong>' + fmt(s.val) + '</strong></span>'
+      + '<span class="' + plCls(s.pl) + '">P&amp;L: <strong>' + sign(s.pl) + fmt(s.pl) + '</strong></span>'
+      + '<span class="' + plCls(s.todayPL) + '">Today: <strong>' + sign(s.todayPL) + fmt(s.todayPL) + '</strong></span>'
+      + '<span>Winners: <strong style="color:var(--green)">' + s.winners + '</strong> / Losers: <strong style="color:var(--red)">' + (s.count - s.winners) + '</strong></span>'
+      + '<span>🟢 ' + s.healthy + ' &nbsp;🟡 ' + s.neutral + ' &nbsp;🔴 ' + s.weak + '</span>';
+  }
+
+  document.getElementById('stocks-summary').innerHTML = summaryHtml(calcSummary(primaryList));
 
   const sortBy = (document.getElementById('stocks-sort') || {}).value || 'plPct';
   const filter = ((document.getElementById('stocks-filter') || {}).value || '').toLowerCase();
-  let rows = stocks.filter(h => !filter || (h.symbol||'').toLowerCase().includes(filter) || (h.sector||'').toLowerCase().includes(filter));
   const sortFns = {
-    plPct:      (a, b) => (a.plPct||0) - (b.plPct||0),
-    todayPLPct: (a, b) => (a.todayPLPct||0) - (b.todayPLPct||0),
-    value:      (a, b) => ((b.ltp||0)*b.qty) - ((a.ltp||0)*a.qty),
-    symbol:     (a, b) => (a.symbol||'').localeCompare(b.symbol||''),
+    plPct:      (a, b) => (a.plPct || 0) - (b.plPct || 0),
+    todayPLPct: (a, b) => (a.todayPLPct || 0) - (b.todayPLPct || 0),
+    value:      (a, b) => ((b.ltp || 0) * b.qty) - ((a.ltp || 0) * a.qty),
+    symbol:     (a, b) => (a.symbol || '').localeCompare(b.symbol || ''),
   };
-  rows.sort(sortFns[sortBy] || sortFns.plPct);
+  function filterAndSort(list) {
+    return list
+      .filter(h => !filter || (h.symbol || '').toLowerCase().includes(filter) || (h.sector || '').toLowerCase().includes(filter))
+      .sort(sortFns[sortBy] || sortFns.plPct);
+  }
 
-  document.getElementById('stocks-tbody').innerHTML = rows.map(h => {
-    const sym    = sanitize(h.symbol || '');
-    const hVal   = (h.ltp || 0) * h.qty;
+  function buildRow(h, key) {
+    const sym  = sanitize(h.symbol || '');
+    const hVal = (h.ltp || 0) * h.qty;
     let badges = '';
     if (h.alertPrice) badges += '<span class="badge-inline badge-alert">⚠ Alert: ₹' + sanitize(String(h.alertPrice)) + '</span>';
     if (h.stopLoss)   badges += '<span class="badge-inline badge-stop">🛑 Stop: ₹' + sanitize(String(h.stopLoss)) + '</span>';
@@ -292,7 +352,7 @@ function renderStocks() {
       + '</div>'
       + '</div>';
 
-    return '<tr onclick="toggleTechPanel(\'' + sym + '\')">'
+    return '<tr onclick="toggleTechPanel(\'' + key + '\')">'
       + '<td><div class="ticker-name">' + sym + '</div><div class="ticker-sub">' + sanitize(h.sector||'') + '</div>' + badges + '</td>'
       + '<td>' + h.qty + '</td>'
       + '<td>' + fmtD(h.avgCost||0) + '</td>'
@@ -302,15 +362,32 @@ function renderStocks() {
       + '<td class="' + plCls(h.todayPL||0) + '">' + sign(h.todayPL||0) + fmt(h.todayPL||0) + '<br><span style="font-size:10px">' + fmtPct(h.todayPLPct||0) + '</span></td>'
       + '<td>' + healthBadge(h.health||'Neutral') + '</td>'
       + '<td>' + week52Bar(h.ltp||0, h.week52Low, h.week52High) + '</td>'
-      + '<td class="expand-btn" id="expand-' + sym + '">▶ details</td>'
+      + '<td class="expand-btn" id="expand-' + key + '">▶ details</td>'
       + '</tr>'
-      + '<tr id="panel-' + sym + '" style="display:none"><td colspan="10" style="padding:0;background:var(--bg)"><div class="tech-panel">' + techHtml + '</div></td></tr>';
-  }).join('');
+      + '<tr id="panel-' + key + '" style="display:none"><td colspan="10" style="padding:0;background:var(--bg)"><div class="tech-panel">' + techHtml + '</div></td></tr>';
+  }
+
+  const primRows = filterAndSort(primaryList).map(h  => buildRow(h,  sanitize(h.symbol) + '-pri')).join('');
+  const secRows  = filterAndSort(secondaryList).map(h => buildRow(h, sanitize(h.symbol) + '-sec')).join('');
+
+  const secSummary = calcSummary(secondaryList);
+  const secHeader = secondaryList.length > 0
+    ? '<tr><td colspan="10" style="padding:8px 10px;background:#f1f5f9;border-top:2px solid var(--border);border-bottom:1px solid var(--border)">'
+      + '<strong style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#475569">📦 Secondary Account</strong>'
+      + '<span style="margin-left:12px;font-size:11px;color:#64748b">'
+      + 'Invested: ' + fmt(secSummary.inv) + ' &nbsp;&middot;&nbsp; '
+      + 'Value: ' + fmt(secSummary.val) + ' &nbsp;&middot;&nbsp; '
+      + '<span class="' + plCls(secSummary.pl) + '">P&amp;L: ' + sign(secSummary.pl) + fmt(secSummary.pl) + '</span>'
+      + ' &nbsp;&middot;&nbsp; <span class="' + plCls(secSummary.todayPL) + '">Today: ' + sign(secSummary.todayPL) + fmt(secSummary.todayPL) + '</span>'
+      + '</span></td></tr>'
+    : '';
+
+  document.getElementById('stocks-tbody').innerHTML = primRows + secHeader + secRows;
 }
 
-function toggleTechPanel(sym) {
-  const panel = document.getElementById('panel-' + sym);
-  const btn   = document.getElementById('expand-' + sym);
+function toggleTechPanel(key) {
+  const panel = document.getElementById('panel-' + key);
+  const btn   = document.getElementById('expand-' + key);
   if (!panel) return;
   const show = panel.style.display === 'none';
   panel.style.display = show ? 'table-row' : 'none';
@@ -519,6 +596,84 @@ function renderMF() {
   document.getElementById('mf-content').innerHTML =
     '<div class="mf-tab-bar">' + buildTabBar() + '</div>'
     + '<div class="mf-tab-content">' + buildTabContent(mfActiveTab) + '</div>';
+}
+
+function updateStockCategoryValidation() {
+  if (!portfolio) return;
+  const stocks = portfolio.stocks || [];
+  let allValid = true;
+  let validCount = 0;
+  stocks.forEach(h => {
+    const sym = h.symbol;
+    const pInput = document.querySelector('.sc-input[data-sym="' + sym + '"][data-field="primary"]');
+    const sInput = document.querySelector('.sc-input[data-sym="' + sym + '"][data-field="secondary"]');
+    if (!pInput || !sInput) return;
+    const pQty = parseInt(pInput.value) || 0;
+    const sQty = parseInt(sInput.value) || 0;
+    const sum  = pQty + sQty;
+    const valid = sum === h.qty;
+    const statusEl = document.getElementById('sc-status-' + sym);
+    if (statusEl) {
+      statusEl.innerHTML = valid
+        ? '<span style="color:var(--green)">&#10003;</span>'
+        : '<span style="color:var(--red);font-size:11px">&#9888; ' + pQty + '+' + sQty + '=' + sum + ' &ne; ' + h.qty + '</span>';
+    }
+    if (valid) validCount++; else allValid = false;
+  });
+  const saveBtn = document.getElementById('sc-save-btn');
+  if (saveBtn) saveBtn.disabled = !allValid;
+  const summaryEl = document.getElementById('sc-summary');
+  if (summaryEl) {
+    summaryEl.innerHTML = '<span style="color:#64748b">'
+      + validCount + ' of ' + stocks.length + ' stocks split correctly'
+      + (validCount < stocks.length ? ' &middot; <span style="color:var(--red)">' + (stocks.length - validCount) + ' need attention</span>' : '')
+      + '</span>';
+  }
+}
+
+function renderStockCategory() {
+  if (!portfolio) return;
+  const stocks = portfolio.stocks || [];
+
+  function getEntry(h) {
+    return stockCategory[h.symbol] || { primary: h.qty, secondary: 0 };
+  }
+
+  const inputStyle = 'width:65px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:center';
+
+  const rows = stocks.map(h => {
+    const sym   = sanitize(h.symbol);
+    const entry = getEntry(h);
+    const sum   = entry.primary + entry.secondary;
+    const valid = sum === h.qty;
+    const statusHtml = valid
+      ? '<span style="color:var(--green)">&#10003;</span>'
+      : '<span style="color:var(--red);font-size:11px">&#9888; ' + entry.primary + '+' + entry.secondary + '=' + sum + ' &ne; ' + h.qty + '</span>';
+    return '<tr>'
+      + '<td><strong>' + sym + '</strong><div style="font-size:10px;color:#94a3b8">' + sanitize(h.sector || '') + '</div></td>'
+      + '<td style="color:#64748b;text-align:center">' + h.qty + '</td>'
+      + '<td style="text-align:center"><input type="number" min="0" class="sc-input" data-sym="' + sym + '" data-field="primary"   value="' + entry.primary   + '" style="' + inputStyle + '" oninput="updateStockCategoryValidation()"></td>'
+      + '<td style="text-align:center"><input type="number" min="0" class="sc-input" data-sym="' + sym + '" data-field="secondary" value="' + entry.secondary + '" style="' + inputStyle + '" oninput="updateStockCategoryValidation()"></td>'
+      + '<td id="sc-status-' + sym + '">' + statusHtml + '</td>'
+      + '</tr>';
+  }).join('');
+
+  const validCount = stocks.filter(h => { const e = getEntry(h); return e.primary + e.secondary === h.qty; }).length;
+  const allValid   = validCount === stocks.length;
+
+  const el = document.getElementById('settings-stock-category');
+  if (!el) return;
+  el.innerHTML = '<div style="overflow-x:auto">'
+    + '<table class="settings-table"><thead><tr>'
+    + '<th>STOCK</th><th style="text-align:center">TOTAL QTY</th><th style="text-align:center">PRIMARY</th><th style="text-align:center">SECONDARY</th><th>STATUS</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:0 2px">'
+    + '<div id="sc-summary"><span style="color:#64748b">'
+    + validCount + ' of ' + stocks.length + ' stocks split correctly'
+    + (validCount < stocks.length ? ' &middot; <span style="color:var(--red)">' + (stocks.length - validCount) + ' need attention</span>' : '')
+    + '</span></div>'
+    + '<button id="sc-save-btn" class="btn-primary" onclick="saveStockCategory()"' + (allValid ? '' : ' disabled') + '>Save</button>'
+    + '</div>';
 }
 
 // ── Data Sources Tab ──────────────────────────────────────────────────────
@@ -740,6 +895,9 @@ function switchSettingsTab(tab) {
   document.querySelectorAll('.stab').forEach(b => {
     if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + tab + "'")) b.classList.add('active');
   });
+  const footer = document.getElementById('settings-footer');
+  if (footer) footer.style.display = tab === 'stock-category' ? 'none' : '';
+  if (tab === 'stock-category') renderStockCategory();
 }
 
 function renderSettings() {
@@ -934,5 +1092,5 @@ async function saveSettings() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
-loadPortfolio().then(startCountdown);
+Promise.all([loadPortfolio(), loadStockCategory()]).then(startCountdown);
 loadSettings();
