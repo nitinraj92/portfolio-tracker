@@ -182,14 +182,16 @@
         <div class="section-bar-left"><span class="section-title">⚙️ Settings</span></div>
       </div>
       <div class="settings-tabs">
-        <button class="stab active" onclick="switchSettingsTab('mf-sips')">💰 MF SIPs</button>
+        <button class="stab active" onclick="switchSettingsTab('stock-category')">📋 Stock Category</button>
+        <button class="stab" onclick="switchSettingsTab('mf-sips')">💰 MF SIPs</button>
         <button class="stab" onclick="switchSettingsTab('etf-sips')">📊 ETF SIPs</button>
         <button class="stab" onclick="switchSettingsTab('assumptions')">📈 Projection Assumptions</button>
       </div>
-      <div id="settings-mf-sips" class="settings-panel active"></div>
+      <div id="settings-stock-category" class="settings-panel active"></div>
+      <div id="settings-mf-sips" class="settings-panel"></div>
       <div id="settings-etf-sips" class="settings-panel"></div>
       <div id="settings-assumptions" class="settings-panel"></div>
-      <div class="settings-footer">
+      <div class="settings-footer" id="settings-footer" style="display:none">
         <button class="btn-secondary" onclick="loadSettings()">Cancel</button>
         <button class="btn-primary" onclick="saveSettings()">Save Changes</button>
       </div>
