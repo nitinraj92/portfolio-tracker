@@ -385,6 +385,29 @@ app.post('/api/settings', (req, res) => {
   res.json({ success: true });
 });
 
+const STOCK_CATEGORY_PATH = path.join(__dirname, 'storage', 'stock_category.json');
+
+app.get('/api/stock-category', (req, res) => {
+  try {
+    res.json(JSON.parse(fs.readFileSync(STOCK_CATEGORY_PATH, 'utf8')));
+  } catch {
+    res.json({});
+  }
+});
+
+app.post('/api/stock-category', (req, res) => {
+  const data = db.read();
+  const validSymbols = new Set((data.stocks || []).map(s => s.symbol));
+  const filtered = {};
+  for (const [sym, val] of Object.entries(req.body || {})) {
+    if (validSymbols.has(sym) && typeof val.primary === 'number' && typeof val.secondary === 'number') {
+      filtered[sym] = { primary: val.primary, secondary: val.secondary };
+    }
+  }
+  fs.writeFileSync(STOCK_CATEGORY_PATH, JSON.stringify(filtered, null, 2));
+  res.json({ success: true });
+});
+
 // POST /api/upload/realized-pnl — upload Zerodha Tax P&L XLSX (supports multiple uploads, aggregated)
 app.post('/api/upload/realized-pnl', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
