@@ -96,8 +96,10 @@ if (AUTH_USER && AUTH_PASS) {
     }
     const user = decoded.slice(0, colon);
     const pass = decoded.slice(colon + 1);
-    const userMatch = crypto.timingSafeEqual(Buffer.from(user), Buffer.from(AUTH_USER));
-    const passMatch = crypto.timingSafeEqual(Buffer.from(pass), Buffer.from(AUTH_PASS));
+    const userMatch = user.length === AUTH_USER.length &&
+                      crypto.timingSafeEqual(Buffer.from(user), Buffer.from(AUTH_USER));
+    const passMatch = pass.length === AUTH_PASS.length &&
+                      crypto.timingSafeEqual(Buffer.from(pass), Buffer.from(AUTH_PASS));
     if (userMatch && passMatch) return next();
     res.set('WWW-Authenticate', 'Basic realm="Portfolio"');
     return res.status(401).send('Unauthorized');
