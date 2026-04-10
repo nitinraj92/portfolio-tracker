@@ -652,7 +652,7 @@ function scheduleRefresh() {
     } catch (err) {
       console.error('[server] Auto-refresh error:', err.message);
     }
-  }, 60 * 1000);
+  }, 10 * 60 * 1000);
 }
 
 // ─── Start ─────────────────────────────────────────────────────────

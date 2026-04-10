@@ -3,7 +3,7 @@ const path = require('path');
 const db = require('../storage/db');
 const { calcRSI, calcHealth } = require('./technicals');
 
-const PYTHON = '/Users/nitinraj/Documents/Wealth_management/portfolio-tracker/.venv/bin/python3';
+const PYTHON = process.env.PYTHON_PATH || 'python3';
 const SCRIPT = path.join(__dirname, 'fetch_prices.py');
 
 /**
