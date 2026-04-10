@@ -6,7 +6,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "jest --runInBand",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "deploy": "echo 'Push: git push origin main | On VM: git pull && pm2 restart portfolio'"
   },
   "dependencies": {
     "express": "^4.18.2",
