@@ -408,9 +408,6 @@ const ETF_THESIS = {
   MASPTOP50:  { tag: 'Holding',          cls: 'thesis-holding' },
   ICICISILVE: { tag: '⚠ Weakest',       cls: 'thesis-review' },
 };
-const ETF_CAT_ORDER = ['India Equity', 'International', 'Precious Metals', 'Other'];
-const ETF_CAT_CLS   = { 'India Equity': 'india', 'International': 'intl', 'Precious Metals': 'metals', 'Other': '' };
-
 function renderETFs() {
   if (!portfolio) return;
   const { etfs = [], sips = {} } = portfolio;
@@ -426,9 +423,8 @@ function renderETFs() {
     '<span class="' + plCls(pl) + '">P&amp;L: <strong>' + sign(pl) + fmt(pl) + ' (' + fmtPct(invested ? pl/invested*100 : 0) + ')</strong></span>' +
     '<span class="' + plCls(todayPL) + '">Today: <strong>' + sign(todayPL) + fmt(todayPL) + '</strong></span>';
 
-  const groups = {};
-  ETF_CAT_ORDER.forEach(c => groups[c] = []);
-  etfs.forEach(e => { const c = e.category || 'Other'; if (!groups[c]) groups[c] = []; groups[c].push(e); });
+  const zerodhaList = etfs.filter(e => e.source === 'zerodha');
+  const iciciList   = etfs.filter(e => e.source === 'icici');
 
   const getSIPLabel = sym => {
     const z = (sips.etf_zerodha||[]).find(s => s.symbol === sym);
@@ -453,37 +449,50 @@ function renderETFs() {
     return !!(z || i);
   };
 
-  // Single table with category separator rows — no repeated headers, aligned columns
-  const allRows = ETF_CAT_ORDER
-    .filter(cat => groups[cat].length > 0)
-    .map(cat => {
-      const catRow = '<tr><td colspan="9" class="etf-group-header ' + ETF_CAT_CLS[cat] + '" style="padding:8px 10px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:#fafafa;border-bottom:1px solid #e2e8f0">' + sanitize(cat) + '</td></tr>';
-      const dataRows = groups[cat].map(e => {
-        const sym  = sanitize(e.symbol || '');
-        const eVal = (e.ltp||0)*e.qty;
-        const ePL  = eVal - (e.avgCost||0)*e.qty;
-        const t    = ETF_THESIS[e.symbol] || { tag: '—', cls: 'thesis-holding' };
-        const pausedBadge = isPaused(e.symbol) ? '<span class="badge-inline badge-paused">⏸ SIP paused</span>' : '';
-        return '<tr>'
-          + '<td><div class="ticker-name">' + sym + '</div>' + pausedBadge + '</td>'
-          + '<td>' + e.qty + '</td>'
-          + '<td>' + (e.avgCost ? fmtD(e.avgCost) : '—') + '</td>'
-          + '<td class="' + plCls(e.todayPL||0) + '">' + fmtD(e.ltp||0) + '</td>'
-          + '<td>' + fmt(eVal) + '</td>'
-          + '<td class="' + plCls(ePL) + '">' + sign(ePL) + fmt(ePL) + '<br><span style="font-size:10px">' + fmtPct(e.plPct||0) + '</span></td>'
-          + '<td class="' + plCls(e.todayPL||0) + '">' + sign(e.todayPL||0) + fmt(e.todayPL||0) + '<br><span style="font-size:10px">' + fmtPct(e.todayPLPct||0) + '</span></td>'
-          + '<td>' + sanitize(getSIPLabel(e.symbol)) + '</td>'
-          + '<td><span class="thesis-tag ' + t.cls + '">' + sanitize(t.tag) + '</span></td>'
-          + '</tr>';
-      }).join('');
-      return catRow + dataRows;
+  function etfSectionHeader(label, emoji, list) {
+    const inv     = list.reduce((s, h) => s + (h.avgCost||0)*h.qty, 0);
+    const val     = list.reduce((s, h) => s + (h.ltp||0)*h.qty, 0);
+    const spl     = val - inv;
+    const todaypl = list.reduce((s, h) => s + (h.todayPL||0), 0);
+    return '<tr><td colspan="9" style="padding:8px 10px;background:#f1f5f9;border-top:2px solid var(--border);border-bottom:1px solid var(--border)">'
+      + '<strong style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#475569">' + emoji + ' ' + label + '</strong>'
+      + '<span style="margin-left:12px;font-size:11px;color:#64748b">'
+      + 'Invested: ' + fmt(inv) + ' &nbsp;·&nbsp; '
+      + 'Value: ' + fmt(val) + ' &nbsp;·&nbsp; '
+      + '<span class="' + plCls(spl) + '">P&L: ' + sign(spl) + fmt(spl) + '</span>'
+      + ' &nbsp;·&nbsp; <span class="' + plCls(todaypl) + '">Today: ' + sign(todaypl) + fmt(todaypl) + '</span>'
+      + '</span></td></tr>';
+  }
+
+  function buildRows(list) {
+    return list.map(e => {
+      const sym  = sanitize(e.symbol || '');
+      const eVal = (e.ltp||0)*e.qty;
+      const ePL  = eVal - (e.avgCost||0)*e.qty;
+      const t    = ETF_THESIS[e.symbol] || { tag: '—', cls: 'thesis-holding' };
+      const pausedBadge = isPaused(e.symbol) ? '<span class="badge-inline badge-paused">⏸ SIP paused</span>' : '';
+      return '<tr>'
+        + '<td><div class="ticker-name">' + sym + '</div>' + pausedBadge + '</td>'
+        + '<td>' + e.qty + '</td>'
+        + '<td>' + (e.avgCost ? fmtD(e.avgCost) : '—') + '</td>'
+        + '<td class="' + plCls(e.todayPL||0) + '">' + fmtD(e.ltp||0) + '</td>'
+        + '<td>' + fmt(eVal) + '</td>'
+        + '<td class="' + plCls(ePL) + '">' + sign(ePL) + fmt(ePL) + '<br><span style="font-size:10px">' + fmtPct(e.plPct||0) + '</span></td>'
+        + '<td class="' + plCls(e.todayPL||0) + '">' + sign(e.todayPL||0) + fmt(e.todayPL||0) + '<br><span style="font-size:10px">' + fmtPct(e.todayPLPct||0) + '</span></td>'
+        + '<td>' + sanitize(getSIPLabel(e.symbol)) + '</td>'
+        + '<td><span class="thesis-tag ' + t.cls + '">' + sanitize(t.tag) + '</span></td>'
+        + '</tr>';
     }).join('');
+  }
+
+  const zHeader = zerodhaList.length > 0 ? etfSectionHeader('Zerodha', '🟢', zerodhaList) : '';
+  const iHeader = iciciList.length   > 0 ? etfSectionHeader('ICICI',   '🔵', iciciList)   : '';
 
   document.getElementById('etfs-content').innerHTML =
     '<div class="table-wrap"><table class="data-table"><thead><tr>'
     + '<th>ETF</th><th>QTY</th><th>AVG</th><th>NAV <span class="live-dot">●</span></th>'
     + '<th>VALUE</th><th>TOTAL P&amp;L</th><th>TODAY</th><th>SIP/MONTH</th><th>THESIS</th>'
-    + '</tr></thead><tbody>' + allRows + '</tbody></table></div>';
+    + '</tr></thead><tbody>' + zHeader + buildRows(zerodhaList) + iHeader + buildRows(iciciList) + '</tbody></table></div>';
 }
 
 // ── MF Tab ────────────────────────────────────────────────────────────────
