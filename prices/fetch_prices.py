@@ -12,7 +12,7 @@ SESSION.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
+    'Accept-Encoding': 'gzip, deflate',
     'Referer': 'https://www.nseindia.com/',
     'Connection': 'keep-alive',
 })
@@ -40,7 +40,6 @@ def nse_quote(symbol):
     url = 'https://www.nseindia.com/api/quote-equity?symbol=' + symbol
     r = SESSION.get(url, timeout=15)
     r.raise_for_status()
-    print('[nse_quote] status=' + str(r.status_code) + ' encoding=' + str(r.encoding) + ' preview=' + repr(r.text[:80]), file=sys.stderr)
     return r.json()
 
 def nse_history(symbol, days=45):
@@ -117,8 +116,7 @@ def fetch(symbol, avg_cost=None, stored_exchange=None):
             'analystTarget': None,
             'closes':        closes,
         }
-    except Exception as e:
-        print('[fetch error] ' + symbol + ': ' + str(e), file=sys.stderr)
+    except Exception:
         return None
 
 
