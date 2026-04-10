@@ -116,7 +116,8 @@ def fetch(symbol, avg_cost=None, stored_exchange=None):
             'analystTarget': None,
             'closes':        closes,
         }
-    except Exception:
+    except Exception as e:
+        print('[fetch error] ' + symbol + ': ' + str(e), file=sys.stderr)
         return None
 
 
