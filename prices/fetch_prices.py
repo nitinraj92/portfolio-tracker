@@ -37,9 +37,10 @@ def init_session():
         pass
 
 def nse_quote(symbol):
-    url = f'https://www.nseindia.com/api/quote-equity?symbol={symbol}'
+    url = 'https://www.nseindia.com/api/quote-equity?symbol=' + symbol
     r = SESSION.get(url, timeout=15)
     r.raise_for_status()
+    print('[nse_quote] status=' + str(r.status_code) + ' encoding=' + str(r.encoding) + ' preview=' + repr(r.text[:80]), file=sys.stderr)
     return r.json()
 
 def nse_history(symbol, days=45):
