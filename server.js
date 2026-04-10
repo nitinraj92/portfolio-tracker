@@ -1,4 +1,5 @@
 'use strict';
+const crypto  = require('crypto');
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
@@ -89,9 +90,15 @@ if (AUTH_USER && AUTH_PASS) {
     }
     const decoded = Buffer.from(auth.slice(6), 'base64').toString();
     const colon   = decoded.indexOf(':');
-    const user    = decoded.slice(0, colon);
-    const pass    = decoded.slice(colon + 1);
-    if (user === AUTH_USER && pass === AUTH_PASS) return next();
+    if (colon === -1) {
+      res.set('WWW-Authenticate', 'Basic realm="Portfolio"');
+      return res.status(401).send('Unauthorized');
+    }
+    const user = decoded.slice(0, colon);
+    const pass = decoded.slice(colon + 1);
+    const userMatch = crypto.timingSafeEqual(Buffer.from(user), Buffer.from(AUTH_USER));
+    const passMatch = crypto.timingSafeEqual(Buffer.from(pass), Buffer.from(AUTH_PASS));
+    if (userMatch && passMatch) return next();
     res.set('WWW-Authenticate', 'Basic realm="Portfolio"');
     return res.status(401).send('Unauthorized');
   });
