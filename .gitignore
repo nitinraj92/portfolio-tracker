@@ -1,5 +1,7 @@
 node_modules/
-data/portfolio.json
+data/
+data_sources/
 uploads/
 *.log
 .venv/
+.env
