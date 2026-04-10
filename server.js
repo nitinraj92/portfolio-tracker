@@ -75,6 +75,28 @@ function extractFileMetadata(filePath, sourceType) {
 }
 
 app.use(express.json());
+
+// Basic auth — set AUTH_USER and AUTH_PASS env vars on the server
+const AUTH_USER = process.env.AUTH_USER;
+const AUTH_PASS = process.env.AUTH_PASS;
+
+if (AUTH_USER && AUTH_PASS) {
+  app.use((req, res, next) => {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Basic ')) {
+      res.set('WWW-Authenticate', 'Basic realm="Portfolio"');
+      return res.status(401).send('Unauthorized');
+    }
+    const decoded = Buffer.from(auth.slice(6), 'base64').toString();
+    const colon   = decoded.indexOf(':');
+    const user    = decoded.slice(0, colon);
+    const pass    = decoded.slice(colon + 1);
+    if (user === AUTH_USER && pass === AUTH_PASS) return next();
+    res.set('WWW-Authenticate', 'Basic realm="Portfolio"');
+    return res.status(401).send('Unauthorized');
+  });
+}
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Helpers ─────────────────────────────────────────────────────────
