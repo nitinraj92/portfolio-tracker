@@ -250,15 +250,28 @@ function renderDashboard() {
   luBadge(lastUpdated?.mfcentral_indumati, 'lu-mf-indu');
 }
 
-// ── Countdown ───────────────────────────────────────────────────────────
+// ── Countdown & last-refresh display ────────────────────────────────────
+function fmtAgo(iso) {
+  if (!iso) return '';
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1)  return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h + 'h' + (m ? ' ' + m + 'm' : '') + ' ago';
+}
+
 function startCountdown() {
   clearInterval(countdownTimer);
-  countdown = 60;
+  countdown = 60;   // poll to re-read data every 60s (cheap GET, not a price fetch)
   countdownTimer = setInterval(() => {
     countdown--;
     const el = document.getElementById('refresh-countdown');
-    if (el) el.textContent = portfolio?.marketOpen ? ('Auto-refresh in ' + countdown + 's') : '';
-    if (countdown <= 0) { countdown = 60; if (portfolio?.marketOpen) loadPortfolio(); }
+    if (el) {
+      const ago  = fmtAgo(portfolio?.lastUpdated?.prices);
+      const mktOpen = portfolio?.marketOpen;
+      el.textContent = ago ? 'Prices: ' + ago + (mktOpen ? ' · auto 30m' : '') : '';
+    }
+    if (countdown <= 0) { countdown = 60; loadPortfolio(); }
   }, 1000);
 }
 

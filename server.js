@@ -372,16 +372,10 @@ function applyExchangeOverrides(holdings) {
 
 app.post('/api/prices/refresh', async (req, res) => {
   try {
-    const data = db.read();
-    data.stocks = await refreshPrices(applyExchangeOverrides(data.stocks));
-    data.etfs = await refreshPrices(applyExchangeOverrides(data.etfs));
-    // Pass mf_scheme_codes by reference so lookups persist into data.mf_scheme_codes
-    // and are saved in the single db.write() below
-    data.mf_nitin    = await refreshMFPrices(data.mf_nitin,    data.mf_scheme_codes);
-    data.mf_indumati = await refreshMFPrices(data.mf_indumati, data.mf_scheme_codes);
-    data.lastUpdated.prices = new Date().toISOString();
-    db.write(data); // Single write — stocks/etfs/mf all correct, scheme codes persisted
-    res.json({ success: true, refreshedAt: data.lastUpdated.prices });
+    // Manual refresh always updates everything regardless of market hours
+    await doStockEtfRefresh();
+    await doMFRefresh();
+    res.json({ success: true, refreshedAt: db.read().lastUpdated.prices });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -635,43 +629,78 @@ app.post('/api/flush', (req, res) => {
 
 // ─── Auto-refresh ─────────────────────────────────────────────────────
 
+const PRICE_FIELDS = ['ltp','prevClose','todayPL','todayPLPct','rsi','health','trend',
+  'dma50','dma200','week52High','week52Low','pe','sectorPe','marketCap','eps','roe','roce',
+  'netMargin','debtEquity','beta','bookValue','dividendYield','analystTarget','exchange',
+  'volume','avgVolume'];
+
+function applyPrices(holding, map) {
+  const updated = map[holding.symbol];
+  if (!updated) return holding;
+  const patch = {};
+  PRICE_FIELDS.forEach(f => { if (updated[f] !== undefined) patch[f] = updated[f]; });
+  return { ...holding, ...patch };
+}
+
+// Refresh stocks + ETFs only (market-hours sensitive)
+async function doStockEtfRefresh() {
+  try {
+    const snapshot = db.read();
+    const updatedStocks = await refreshPrices(applyExchangeOverrides(snapshot.stocks));
+    const updatedEtfs   = await refreshPrices(applyExchangeOverrides(snapshot.etfs));
+    const data = db.read();
+    const stockMap = Object.fromEntries(updatedStocks.map(s => [s.symbol, s]));
+    const etfMap   = Object.fromEntries(updatedEtfs.map(e => [e.symbol, e]));
+    data.stocks = data.stocks.map(s => applyPrices(s, stockMap));
+    data.etfs   = data.etfs.map(e => applyPrices(e, etfMap));
+    data.lastUpdated.prices = new Date().toISOString();
+    db.write(data);
+    console.log('[server] Stock/ETF refresh done');
+  } catch (err) {
+    console.error('[server] Stock/ETF refresh error:', err.message);
+  }
+}
+
+// Refresh MF only
+async function doMFRefresh() {
+  try {
+    const data = db.read();
+    data.mf_nitin    = await refreshMFPrices(data.mf_nitin,    data.mf_scheme_codes);
+    data.mf_indumati = await refreshMFPrices(data.mf_indumati, data.mf_scheme_codes);
+    data.lastUpdated.prices = new Date().toISOString();
+    db.write(data);
+    console.log('[server] MF refresh done');
+  } catch (err) {
+    console.error('[server] MF refresh error:', err.message);
+  }
+}
+
 let refreshTimer = null;
+let lastScheduledMinute = -1;
 
 function scheduleRefresh() {
+  // 30-min auto-refresh during market hours
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(async () => {
     if (!isMarketOpen()) return;
-    console.log('[server] Auto-refreshing prices...');
-    try {
-      // Snapshot used only for fetching prices — do NOT write this back
-      const snapshot = db.read();
-      const updatedStocks = await refreshPrices(applyExchangeOverrides(snapshot.stocks));
-      const updatedEtfs   = await refreshPrices(applyExchangeOverrides(snapshot.etfs));
+    console.log('[server] Auto-refreshing stocks/ETFs (30m interval)...');
+    await doStockEtfRefresh();
+  }, 30 * 60 * 1000);
 
-      // Re-read AFTER async ops so any uploads during the fetch aren't overwritten
-      const data = db.read();
-      const stockMap = Object.fromEntries(updatedStocks.map(s => [s.symbol, s]));
-      const etfMap   = Object.fromEntries(updatedEtfs.map(e => [e.symbol, e]));
-
-      // Merge: base is fresh data, overlay only price-related fields
-      const PRICE_FIELDS = ['ltp','prevClose','todayPL','todayPLPct','rsi','health','trend',
-        'dma50','dma200','week52High','week52Low','pe','marketCap','eps','roe','netMargin',
-        'debtEquity','beta','bookValue','dividendYield','analystTarget','exchange'];
-      function applyPrices(holding, map) {
-        const updated = map[holding.symbol];
-        if (!updated) return holding;
-        const patch = {};
-        PRICE_FIELDS.forEach(f => { if (updated[f] !== undefined) patch[f] = updated[f]; });
-        return { ...holding, ...patch };
-      }
-      data.stocks = data.stocks.map(s => applyPrices(s, stockMap));
-      data.etfs   = data.etfs.map(e => applyPrices(e, etfMap));
-      data.lastUpdated.prices = new Date().toISOString();
-      db.write(data);
-    } catch (err) {
-      console.error('[server] Auto-refresh error:', err.message);
-    }
-  }, 10 * 60 * 1000);
+  // Minute-checker: trigger at exactly 9:15 (open) and 15:30 (close)
+  // Stocks+ETFs+MF both times. MF NAV is available at these times.
+  setInterval(async () => {
+    const ist  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const day  = ist.getDay();
+    const mins = ist.getHours() * 60 + ist.getMinutes();
+    if (day === 0 || day === 6) return;
+    if (mins !== 555 && mins !== 930) return;     // 9:15 or 15:30 only
+    if (mins === lastScheduledMinute) return;       // don't double-fire
+    lastScheduledMinute = mins;
+    console.log('[server] Scheduled trigger at', ist.toTimeString().slice(0, 5));
+    await doStockEtfRefresh();
+    await doMFRefresh();
+  }, 60 * 1000);
 }
 
 // ─── Start ─────────────────────────────────────────────────────────
