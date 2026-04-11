@@ -345,18 +345,13 @@ function renderStocks() {
       + '<div class="tech-section"><div class="tech-label">Fundamentals</div>'
       + (h.pe ? tr('P/E Ratio', h.pe.toFixed(1) + (h.sectorPe ? ' <span style="color:#94a3b8;font-size:10px">(Sector: ' + h.sectorPe.toFixed(1) + ')</span>' : '')) : '')
       + (h.eps ? tr('EPS (TTM)', '₹'+h.eps.toFixed(2)) : '')
-      + (function() {
-          const v = h.roe || h.netMargin;
-          if (!v) return '';
-          const lbl = h.roe ? 'ROE' : 'Net Margin';
-          const cls = v > 15 ? 'val-green' : v < 5 ? 'val-red' : '';
-          return '<div class="tech-row"><span>' + lbl + '</span><span class="' + cls + '">' + v.toFixed(1) + '%</span></div>';
-        })()
+      + (h.roe  ? trc('ROE',  h.roe.toFixed(1)  + '%', h.roe  > 15 ? 'val-green' : h.roe  < 5 ? 'val-red' : '') : '')
+      + (h.roce ? trc('ROCE', h.roce.toFixed(1) + '%', h.roce > 15 ? 'val-green' : h.roce < 5 ? 'val-red' : '') : '')
       + (h.debtEquity != null ? trc('Debt / Equity', h.debtEquity.toFixed(2), h.debtEquity > 1 ? 'val-red' : 'val-green') : '')
       + (h.marketCap ? tr('Market Cap', '₹'+(h.marketCap/10000000).toFixed(1)+'Cr') : '')
       + '</div>'
       + '<div class="tech-section"><div class="tech-label">Analyst & Risk</div>'
-      + (h.beta ? trc('Beta', h.beta.toFixed(2), h.beta > 1.2 ? 'val-red' : h.beta < 0.8 ? 'val-green' : '') : '')
+      + (h.eps ? tr('EPS (TTM)', '₹'+h.eps.toFixed(2)) : '')
       + (h.bookValue ? tr('Book Value', '₹'+h.bookValue.toFixed(1)) : '')
       + (h.dividendYield ? tr('Dividend Yield', h.dividendYield.toFixed(2)+'%') : '')
       + (h.analystTarget ? trc('Analyst Target', '₹'+h.analystTarget.toLocaleString('en-IN',{maximumFractionDigits:0}), h.ltp ? plCls(h.analystTarget - h.ltp) : '') : '')
@@ -364,7 +359,7 @@ function renderStocks() {
       + '</div>';
 
     return '<tr onclick="toggleTechPanel(\'' + key + '\')">'
-      + '<td><div class="ticker-name">' + sym + '</div><div class="ticker-sub">' + sanitize(h.sector||'') + '</div>' + badges + '</td>'
+      + '<td><div class="ticker-name">' + sym + ' <span style="font-size:9px;font-weight:600;color:#94a3b8;letter-spacing:0.3px">' + sanitize(h.exchange||'') + '</span></div><div class="ticker-sub">' + sanitize(h.sector||'') + '</div>' + badges + '</td>'
       + '<td>' + h.qty + '</td>'
       + '<td>' + fmtD(h.avgCost||0) + '</td>'
       + '<td class="' + plCls(h.todayPL||0) + '">' + fmtD(h.ltp||0) + '</td>'
@@ -483,7 +478,7 @@ function renderETFs() {
       const t    = ETF_THESIS[e.symbol] || { tag: '—', cls: 'thesis-holding' };
       const pausedBadge = isPaused(e.symbol) ? '<span class="badge-inline badge-paused">⏸ SIP paused</span>' : '';
       return '<tr>'
-        + '<td><div class="ticker-name">' + sym + '</div>' + pausedBadge + '</td>'
+        + '<td><div class="ticker-name">' + sym + ' <span style="font-size:9px;font-weight:600;color:#94a3b8;letter-spacing:0.3px">' + sanitize(e.exchange||'') + '</span></div>' + pausedBadge + '</td>'
         + '<td>' + e.qty + '</td>'
         + '<td>' + (e.avgCost ? fmtD(e.avgCost) : '—') + '</td>'
         + '<td class="' + plCls(e.todayPL||0) + '">' + fmtD(e.ltp||0) + '</td>'

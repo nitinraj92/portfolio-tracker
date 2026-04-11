@@ -171,12 +171,14 @@ def _scrape_screener(symbol):
                 return None
 
         return {
-            'eps':           extract(r'EPS[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
-            'roe':           extract(r'ROE[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
-            'dividendYield': extract(r'Dividend Yield[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
-            'bookValue':     extract(r'Book Value[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
-            'debtEquity':    extract(r'Debt to equity[^<]*</span>\s*<span[^>]*>([\d.,]+)')
-                          or extract(r'Debt / Equity[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
+            '_ts':           time.time(),
+            'eps':           extract(r'EPS.*?<span[^>]*>([\d.,]+)'),
+            'roe':           extract(r'ROE.*?<span[^>]*>([\d.,]+)'),
+            'roce':          extract(r'ROCE.*?<span[^>]*>([\d.,]+)'),
+            'dividendYield': extract(r'Dividend Yield.*?<span[^>]*>([\d.,]+)'),
+            'bookValue':     extract(r'Book Value.*?<span[^>]*>([\d.,]+)'),
+            'debtEquity':    extract(r'Debt to equity.*?<span[^>]*>([\d.,]+)')
+                          or extract(r'Debt / Equity.*?<span[^>]*>([\d.,]+)'),
         }
     except Exception:
         return {}
@@ -257,6 +259,7 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None, sc=No
             'sectorPe':      sector_pe,
             'eps':           sc.get('eps'),
             'roe':           sc.get('roe'),
+            'roce':          sc.get('roce'),
             'netMargin':     None,
             'debtEquity':    sc.get('debtEquity'),
             'beta':          None,

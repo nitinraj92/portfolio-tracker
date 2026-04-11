@@ -94,6 +94,7 @@ async function refreshPrices(holdings) {
       sectorPe:       data.sectorPe      || null,
       eps:            data.eps           || null,
       roe:            data.roe           || null,
+      roce:           data.roce          || null,
       netMargin:      data.netMargin     || null,
       debtEquity:     data.debtEquity    || null,
       marketCap:      data.marketCap     || null,
