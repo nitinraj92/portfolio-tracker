@@ -354,13 +354,35 @@ function renderStocks() {
       + '</div>'
       + '<div class="tech-section"><div class="tech-label">Fundamentals</div>'
       + (h.pe ? tr('P/E Ratio', h.pe.toFixed(1) + (h.sectorPe ? ' <span style="color:#94a3b8;font-size:10px">(Sector: ' + h.sectorPe.toFixed(1) + ')</span>' : '')) : '')
-      + (h.eps ? tr('EPS (TTM)', '₹'+h.eps.toFixed(2)) : '')
       + (h.roe  ? trc('ROE',  h.roe.toFixed(1)  + '%', h.roe  > 15 ? 'val-green' : h.roe  < 5 ? 'val-red' : '') : '')
       + (h.roce ? trc('ROCE', h.roce.toFixed(1) + '%', h.roce > 15 ? 'val-green' : h.roce < 5 ? 'val-red' : '') : '')
       + (h.debtEquity != null ? trc('Debt / Equity', h.debtEquity.toFixed(2), h.debtEquity > 1 ? 'val-red' : 'val-green') : '')
       + (h.marketCap ? tr('Market Cap', '₹'+(h.marketCap/10000000).toFixed(1)+'Cr') : '')
       + '</div>'
       + '<div class="tech-section"><div class="tech-label">Analyst & Risk</div>'
+      + (function() {
+          const rsi = h.rsi, ltp = h.ltp||0, d50 = h.dma50, d200 = h.dma200;
+          let sig = null, cls = '', icon = '';
+          if (rsi != null && d50 != null) {
+            if      (rsi < 35 && ltp > d50)              { sig = 'Strong Buy';  cls = 'val-green';  icon = '▲▲'; }
+            else if (rsi < 45 && ltp > d50)              { sig = 'Buy';         cls = 'val-green';  icon = '▲';  }
+            else if (ltp > d50 && (!d200 || ltp > d200)) { sig = 'Accumulate';  cls = 'val-green';  icon = '↗';  }
+            else if (rsi > 70 && ltp < (d200||d50))      { sig = 'Strong Sell'; cls = 'val-red';    icon = '▼▼'; }
+            else if (rsi > 60 && ltp < d50)              { sig = 'Sell';        cls = 'val-red';    icon = '▼';  }
+            else if (ltp < d50)                          { sig = 'Reduce';      cls = 'val-amber';  icon = '↘';  }
+            else                                         { sig = 'Hold';        cls = '';           icon = '→';  }
+          } else if (rsi != null) {
+            if      (rsi < 35) { sig = 'Oversold'; cls = 'val-green'; icon = '▲'; }
+            else if (rsi > 70) { sig = 'Overbought'; cls = 'val-red'; icon = '▼'; }
+            else               { sig = 'Neutral'; icon = '→'; }
+          } else if (d50 != null) {
+            sig = ltp > d50 ? 'Above 50 DMA' : 'Below 50 DMA';
+            cls = ltp > d50 ? 'val-green' : 'val-red';
+            icon = ltp > d50 ? '▲' : '▼';
+          }
+          if (!sig) return '';
+          return '<div class="tech-row"><span>Signal</span><span class="' + cls + '" style="font-weight:600">' + icon + ' ' + sig + '</span></div>';
+        })()
       + (h.eps ? tr('EPS (TTM)', '₹'+h.eps.toFixed(2)) : '')
       + (h.bookValue ? tr('Book Value', '₹'+h.bookValue.toFixed(1)) : '')
       + (h.dividendYield ? tr('Dividend Yield', h.dividendYield.toFixed(2)+'%') : '')
