@@ -324,31 +324,34 @@ function renderStocks() {
     if (h.alertPrice) badges += '<span class="badge-inline badge-alert">⚠ Alert: ₹' + sanitize(String(h.alertPrice)) + '</span>';
     if (h.stopLoss)   badges += '<span class="badge-inline badge-stop">🛑 Stop: ₹' + sanitize(String(h.stopLoss)) + '</span>';
 
+    const tr = (label, val) => val ? '<div class="tech-row"><span>' + label + '</span><span>' + val + '</span></div>' : '';
+    const trc = (label, val, cls) => val ? '<div class="tech-row"><span>' + label + '</span><span class="' + cls + '">' + val + '</span></div>' : '';
     const techHtml = '<div class="tech-grid">'
       + '<div class="tech-section"><div class="tech-label">Price Technicals</div>'
-      + '<div class="tech-row"><span>RSI (14)</span><span class="' + ((h.rsi||50)<35?'val-red':(h.rsi||50)>65?'val-amber':'val-green') + '">' + (h.rsi ? h.rsi.toFixed(1) : '—') + '</span></div>'
-      + '<div class="tech-row"><span>vs 50 DMA</span><span class="' + ((h.ltp||0)>(h.dma50||0)?'val-green':'val-red') + '">' + (h.dma50 ? ((h.ltp||0)>h.dma50 ? 'Above ₹'+Math.round(h.dma50).toLocaleString('en-IN')+' ▲' : 'Below ₹'+Math.round(h.dma50).toLocaleString('en-IN')+' ▼') : '—') + '</span></div>'
-      + '<div class="tech-row"><span>vs 200 DMA</span><span class="' + ((h.ltp||0)>(h.dma200||0)?'val-green':'val-red') + '">' + (h.dma200 ? ((h.ltp||0)>h.dma200 ? 'Above ₹'+Math.round(h.dma200).toLocaleString('en-IN')+' ▲' : 'Below ₹'+Math.round(h.dma200).toLocaleString('en-IN')+' ▼') : '—') + '</span></div>'
-      + '<div class="tech-row"><span>Trend</span><span class="' + (h.trend==='Bullish'?'val-green':'val-red') + '">' + sanitize(h.trend||'—') + '</span></div>'
-      + '<div class="tech-row"><span>52W Range</span><span>' + (h.week52Low ? '₹'+Math.round(h.week52Low).toLocaleString('en-IN')+'–₹'+Math.round(h.week52High).toLocaleString('en-IN') : '—') + '</span></div>'
+      + (h.rsi ? '<div class="tech-row"><span>RSI (14)</span><span class="' + ((h.rsi||50)<35?'val-red':(h.rsi||50)>65?'val-amber':'val-green') + '">' + h.rsi.toFixed(1) + '</span></div>' : '')
+      + (h.dma50 ? '<div class="tech-row"><span>vs 50 DMA</span><span class="' + ((h.ltp||0)>h.dma50?'val-green':'val-red') + '">' + ((h.ltp||0)>h.dma50 ? 'Above ₹'+Math.round(h.dma50).toLocaleString('en-IN')+' ▲' : 'Below ₹'+Math.round(h.dma50).toLocaleString('en-IN')+' ▼') + '</span></div>' : '')
+      + (h.dma200 ? '<div class="tech-row"><span>vs 200 DMA</span><span class="' + ((h.ltp||0)>h.dma200?'val-green':'val-red') + '">' + ((h.ltp||0)>h.dma200 ? 'Above ₹'+Math.round(h.dma200).toLocaleString('en-IN')+' ▲' : 'Below ₹'+Math.round(h.dma200).toLocaleString('en-IN')+' ▼') + '</span></div>' : '')
+      + (h.trend ? trc('Trend', sanitize(h.trend), h.trend==='Bullish'?'val-green':'val-red') : '')
+      + (h.week52Low ? tr('52W Range', '₹'+Math.round(h.week52Low).toLocaleString('en-IN')+'–₹'+Math.round(h.week52High).toLocaleString('en-IN')) : '')
       + '</div>'
       + '<div class="tech-section"><div class="tech-label">Fundamentals</div>'
-      + '<div class="tech-row"><span>P/E Ratio</span><span>' + (h.pe ? h.pe.toFixed(1) : '—') + '</span></div>'
-      + '<div class="tech-row"><span>EPS (TTM)</span><span>' + (h.eps ? '₹'+h.eps.toFixed(2) : '—') + '</span></div>'
+      + (h.pe ? tr('P/E Ratio', h.pe.toFixed(1)) : '')
+      + (h.eps ? tr('EPS (TTM)', '₹'+h.eps.toFixed(2)) : '')
       + (function() {
           const v = h.roe || h.netMargin;
+          if (!v) return '';
           const lbl = h.roe ? 'ROE' : 'Net Margin';
-          const cls = v ? (v > 15 ? 'val-green' : v < 5 ? 'val-red' : '') : '';
-          return '<div class="tech-row"><span>' + lbl + '</span><span class="' + cls + '">' + (v ? v.toFixed(1)+'%' : '—') + '</span></div>';
+          const cls = v > 15 ? 'val-green' : v < 5 ? 'val-red' : '';
+          return '<div class="tech-row"><span>' + lbl + '</span><span class="' + cls + '">' + v.toFixed(1) + '%</span></div>';
         })()
-      + '<div class="tech-row"><span>Debt / Equity</span><span class="' + (h.debtEquity != null ? (h.debtEquity > 1 ? 'val-red' : 'val-green') : '') + '">' + (h.debtEquity != null ? h.debtEquity.toFixed(2) : '—') + '</span></div>'
-      + '<div class="tech-row"><span>Market Cap</span><span>' + (h.marketCap ? '₹'+(h.marketCap/10000000).toFixed(1)+'Cr' : '—') + '</span></div>'
+      + (h.debtEquity != null ? trc('Debt / Equity', h.debtEquity.toFixed(2), h.debtEquity > 1 ? 'val-red' : 'val-green') : '')
+      + (h.marketCap ? tr('Market Cap', '₹'+(h.marketCap/10000000).toFixed(1)+'Cr') : '')
       + '</div>'
       + '<div class="tech-section"><div class="tech-label">Analyst & Risk</div>'
-      + '<div class="tech-row"><span>Beta</span><span class="' + (!h.beta ? '' : h.beta > 1.2 ? 'val-red' : h.beta < 0.8 ? 'val-green' : '') + '">' + (h.beta ? h.beta.toFixed(2) : '—') + '</span></div>'
-      + '<div class="tech-row"><span>Book Value</span><span>' + (h.bookValue ? '₹'+h.bookValue.toFixed(1) : '—') + '</span></div>'
-      + '<div class="tech-row"><span>Dividend Yield</span><span>' + (h.dividendYield ? h.dividendYield.toFixed(2)+'%' : '—') + '</span></div>'
-      + '<div class="tech-row"><span>Analyst Target</span><span class="' + (h.analystTarget && h.ltp ? plCls(h.analystTarget - h.ltp) : '') + '">' + (h.analystTarget ? '₹'+h.analystTarget.toLocaleString('en-IN',{maximumFractionDigits:0}) : '—') + '</span></div>'
+      + (h.beta ? trc('Beta', h.beta.toFixed(2), h.beta > 1.2 ? 'val-red' : h.beta < 0.8 ? 'val-green' : '') : '')
+      + (h.bookValue ? tr('Book Value', '₹'+h.bookValue.toFixed(1)) : '')
+      + (h.dividendYield ? tr('Dividend Yield', h.dividendYield.toFixed(2)+'%') : '')
+      + (h.analystTarget ? trc('Analyst Target', '₹'+h.analystTarget.toLocaleString('en-IN',{maximumFractionDigits:0}), h.ltp ? plCls(h.analystTarget - h.ltp) : '') : '')
       + '</div>'
       + '</div>';
 

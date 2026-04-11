@@ -164,6 +164,14 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None):
         except Exception:
             pass
 
+        market_cap = None
+        try:
+            issued = d.get('securityInfo', {}).get('issuedSize')
+            if issued:
+                market_cap = int(float(issued) * price)
+        except Exception:
+            pass
+
         closes = get_closes(lookup, history_cache) if history_cache else []
 
         # Calculate DMA50/DMA200 from cached closes
@@ -180,7 +188,7 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None):
             'dma200':        dma200,
             'week52High':    round(float(wk52_high), 2) if wk52_high else None,
             'week52Low':     round(float(wk52_low),  2) if wk52_low  else None,
-            'marketCap':     None,
+            'marketCap':     market_cap,
             'pe':            pe,
             'eps':           None,
             'roe':           None,
