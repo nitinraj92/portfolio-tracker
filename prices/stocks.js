@@ -18,7 +18,7 @@ function fetchPricesBatch(holdings) {
       exchange: h.exchange || null,
     }));
 
-    const child = execFile(PYTHON, [SCRIPT], { timeout: 120000 }, (err, stdout, stderr) => {
+    const child = execFile(PYTHON, [SCRIPT], { timeout: 600000 }, (err, stdout, stderr) => {
       if (err) {
         console.warn('[prices/stocks] Python fetch error:', err.message);
         return resolve({});
@@ -91,6 +91,7 @@ async function refreshPrices(holdings) {
       week52High:  data.week52High || null,
       week52Low:   data.week52Low  || null,
       pe:             data.pe            || null,
+      sectorPe:       data.sectorPe      || null,
       eps:            data.eps           || null,
       roe:            data.roe           || null,
       netMargin:      data.netMargin     || null,

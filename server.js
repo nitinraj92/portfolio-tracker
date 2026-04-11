@@ -443,11 +443,15 @@ app.post('/api/stock-category', (req, res) => {
     ...(data.etfs   || []).map(e => e.symbol),
   ]);
   const filtered = {};
+  const etfSymbols = new Set((data.etfs || []).map(e => e.symbol));
   for (const [sym, val] of Object.entries(req.body || {})) {
-    if (validSymbols.has(sym) && typeof val.primary === 'number' && typeof val.secondary === 'number') {
-      filtered[sym] = { primary: val.primary ?? undefined, secondary: val.secondary ?? undefined, exchange: val.exchange || 'NSE' };
-      if (filtered[sym].primary === undefined) delete filtered[sym].primary;
-      if (filtered[sym].secondary === undefined) delete filtered[sym].secondary;
+    if (!validSymbols.has(sym)) continue;
+    if (etfSymbols.has(sym)) {
+      // ETFs: only exchange preference, no qty split
+      filtered[sym] = { exchange: val.exchange || 'NSE' };
+    } else if (typeof val.primary === 'number' && typeof val.secondary === 'number') {
+      // Stocks: full entry
+      filtered[sym] = { primary: val.primary, secondary: val.secondary, exchange: val.exchange || 'NSE' };
     }
   }
   fs.writeFileSync(STOCK_CATEGORY_PATH, JSON.stringify(filtered, null, 2));
