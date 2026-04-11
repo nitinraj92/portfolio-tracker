@@ -357,11 +357,20 @@ app.post('/api/upload/mfcentral', upload.single('file'), (req, res) => {
   }
 });
 
+function applyExchangeOverrides(holdings) {
+  let cat = {};
+  try { cat = JSON.parse(fs.readFileSync(STOCK_CATEGORY_PATH, 'utf8')); } catch {}
+  return holdings.map(h => {
+    const exch = cat[h.symbol]?.exchange;
+    return exch ? { ...h, exchange: exch } : h;
+  });
+}
+
 app.post('/api/prices/refresh', async (req, res) => {
   try {
     const data = db.read();
-    data.stocks = await refreshPrices(data.stocks);
-    data.etfs = await refreshPrices(data.etfs);
+    data.stocks = await refreshPrices(applyExchangeOverrides(data.stocks));
+    data.etfs = await refreshPrices(applyExchangeOverrides(data.etfs));
     // Pass mf_scheme_codes by reference so lookups persist into data.mf_scheme_codes
     // and are saved in the single db.write() below
     data.mf_nitin    = await refreshMFPrices(data.mf_nitin,    data.mf_scheme_codes);
@@ -429,7 +438,7 @@ app.post('/api/stock-category', (req, res) => {
   const filtered = {};
   for (const [sym, val] of Object.entries(req.body || {})) {
     if (validSymbols.has(sym) && typeof val.primary === 'number' && typeof val.secondary === 'number') {
-      filtered[sym] = { primary: val.primary, secondary: val.secondary };
+      filtered[sym] = { primary: val.primary, secondary: val.secondary, exchange: val.exchange || 'NSE' };
     }
   }
   fs.writeFileSync(STOCK_CATEGORY_PATH, JSON.stringify(filtered, null, 2));
@@ -623,8 +632,8 @@ function scheduleRefresh() {
     try {
       // Snapshot used only for fetching prices — do NOT write this back
       const snapshot = db.read();
-      const updatedStocks = await refreshPrices(snapshot.stocks);
-      const updatedEtfs   = await refreshPrices(snapshot.etfs);
+      const updatedStocks = await refreshPrices(applyExchangeOverrides(snapshot.stocks));
+      const updatedEtfs   = await refreshPrices(applyExchangeOverrides(snapshot.etfs));
 
       // Re-read AFTER async ops so any uploads during the fetch aren't overwritten
       const data = db.read();

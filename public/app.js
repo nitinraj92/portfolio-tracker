@@ -48,9 +48,11 @@ async function saveStockCategory() {
     const sym = h.symbol;
     const pInput = document.querySelector('.sc-input[data-sym="' + sym + '"][data-field="primary"]');
     const sInput = document.querySelector('.sc-input[data-sym="' + sym + '"][data-field="secondary"]');
+    const eInput = document.querySelector('.sc-exch[data-sym="' + sym + '"]');
     newCategory[sym] = {
       primary:   parseInt((pInput && pInput.value) || '0') || 0,
       secondary: parseInt((sInput && sInput.value) || '0') || 0,
+      exchange:  (eInput && eInput.value) || 'NSE',
     };
   });
   const r = await api('POST', '/api/stock-category', newCategory);
@@ -664,11 +666,17 @@ function renderStockCategory() {
     const statusHtml = valid
       ? '<span style="color:var(--green)">&#10003;</span>'
       : '<span style="color:var(--red);font-size:11px">&#9888; ' + entry.primary + '+' + entry.secondary + '=' + sum + ' &ne; ' + h.qty + '</span>';
+    const exchVal = entry.exchange || 'NSE';
+    const exchSel = '<select class="sc-exch settings-select" data-sym="' + sym + '" style="font-size:12px;padding:3px 6px">'
+      + '<option value="NSE"' + (exchVal === 'NSE' ? ' selected' : '') + '>NSE</option>'
+      + '<option value="BSE"' + (exchVal === 'BSE' ? ' selected' : '') + '>BSE</option>'
+      + '</select>';
     return '<tr>'
       + '<td><strong>' + sym + '</strong><div style="font-size:10px;color:#94a3b8">' + sanitize(h.sector || '') + '</div></td>'
       + '<td style="color:#64748b;text-align:center">' + h.qty + '</td>'
       + '<td style="text-align:center"><input type="number" min="0" class="sc-input" data-sym="' + sym + '" data-field="primary"   value="' + entry.primary   + '" style="' + inputStyle + '" oninput="updateStockCategoryValidation()"></td>'
       + '<td style="text-align:center"><input type="number" min="0" class="sc-input" data-sym="' + sym + '" data-field="secondary" value="' + entry.secondary + '" style="' + inputStyle + '" oninput="updateStockCategoryValidation()"></td>'
+      + '<td style="text-align:center">' + exchSel + '</td>'
       + '<td id="sc-status-' + sym + '">' + statusHtml + '</td>'
       + '</tr>';
   }).join('');
@@ -680,7 +688,7 @@ function renderStockCategory() {
   if (!el) return;
   el.innerHTML = '<div style="overflow-x:auto">'
     + '<table class="settings-table"><thead><tr>'
-    + '<th>STOCK</th><th style="text-align:center">TOTAL QTY</th><th style="text-align:center">PRIMARY</th><th style="text-align:center">SECONDARY</th><th>STATUS</th>'
+    + '<th>STOCK</th><th style="text-align:center">TOTAL QTY</th><th style="text-align:center">PRIMARY</th><th style="text-align:center">SECONDARY</th><th style="text-align:center">EXCHANGE</th><th>STATUS</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:0 2px">'
     + '<div id="sc-summary"><span style="color:#64748b">'
