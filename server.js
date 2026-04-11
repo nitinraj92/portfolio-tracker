@@ -182,13 +182,18 @@ function calcPortfolioSummary(data) {
   const unrealizedPL  = r(totalPL);
   const realizedPL    = r(realizedPLAmt);
   const grandTotalPL  = r(unrealizedPL + realizedPL);
-  const grandTotalPct = totalInvested > 0 ? r((grandTotalPL / totalInvested) * 100) : 0;
+
+  // Subtract realized P&L from both invested and value so both reflect original capital only.
+  // Reinvested realized gains inflate cost basis; removing them shows true capital deployed.
+  const netInvested   = r(totalInvested - realizedPLAmt);
+  const netValue      = r(totalValue    - realizedPLAmt);
+  const grandTotalPct = netInvested > 0 ? r((grandTotalPL / netInvested) * 100) : 0;
 
   return {
-    totalInvested: r(totalInvested),
-    totalValue: r(totalValue),
+    totalInvested: netInvested,
+    totalValue: netValue,
     unrealizedPL,
-    unrealizedPLPct: totalInvested > 0 ? r((unrealizedPL / totalInvested) * 100) : 0,
+    unrealizedPLPct: netInvested > 0 ? r((unrealizedPL / netInvested) * 100) : 0,
     realizedPL,
     realizedWinners: realized_pnl.winners || 0,
     realizedLosers:  realized_pnl.losers  || 0,
