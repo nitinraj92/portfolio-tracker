@@ -183,15 +183,14 @@ function calcPortfolioSummary(data) {
   const realizedPL    = r(realizedPLAmt);
   const grandTotalPL  = r(unrealizedPL + realizedPL);
 
-  // Subtract realized P&L from both invested and value so both reflect original capital only.
-  // Reinvested realized gains inflate cost basis; removing them shows true capital deployed.
+  // netInvested = cost of current holdings minus realized gains already booked.
+  // Reinvested realized gains inflate the cost basis; removing them shows true original capital.
   const netInvested   = r(totalInvested - realizedPLAmt);
-  const netValue      = r(totalValue    - realizedPLAmt);
   const grandTotalPct = netInvested > 0 ? r((grandTotalPL / netInvested) * 100) : 0;
 
   return {
     totalInvested: netInvested,
-    totalValue: netValue,
+    totalValue: r(totalValue),
     unrealizedPL,
     unrealizedPLPct: netInvested > 0 ? r((unrealizedPL / netInvested) * 100) : 0,
     realizedPL,
