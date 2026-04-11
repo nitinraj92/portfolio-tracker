@@ -199,11 +199,14 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None, sc=No
         d  = nse_quote(lookup)
         pi = d.get('priceInfo', {})
 
-        price = pi.get('lastPrice') or pi.get('close')
-        if not price or float(price) <= 0:
+        # Use official closing price when available (market closed); real-time lastPrice during hours
+        close_price = float(pi.get('close') or 0)
+        last_price  = float(pi.get('lastPrice') or 0)
+        price = close_price if close_price > 0 else last_price
+        if price <= 0:
             return None
 
-        price      = round(float(price), 2)
+        price      = round(price, 2)
         prev_close = pi.get('previousClose')
         prev_close = round(float(prev_close), 2) if prev_close else price
 
