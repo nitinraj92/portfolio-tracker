@@ -43,6 +43,7 @@ async function loadStockCategory() {
 async function saveStockCategory() {
   if (!portfolio) return;
   const stocks = portfolio.stocks || [];
+  const etfs   = portfolio.etfs   || [];
   const newCategory = {};
   stocks.forEach(h => {
     const sym = h.symbol;
@@ -54,6 +55,11 @@ async function saveStockCategory() {
       secondary: parseInt((sInput && sInput.value) || '0') || 0,
       exchange:  (eInput && eInput.value) || 'NSE',
     };
+  });
+  etfs.forEach(e => {
+    const sym    = e.symbol;
+    const eInput = document.querySelector('.sc-exch[data-sym="' + sym + '"]');
+    newCategory[sym] = Object.assign(newCategory[sym] || {}, { exchange: (eInput && eInput.value) || 'NSE' });
   });
   const r = await api('POST', '/api/stock-category', newCategory);
   if (r.success) {
@@ -337,7 +343,7 @@ function renderStocks() {
       + (h.week52Low ? tr('52W Range', '₹'+Math.round(h.week52Low).toLocaleString('en-IN')+'–₹'+Math.round(h.week52High).toLocaleString('en-IN')) : '')
       + '</div>'
       + '<div class="tech-section"><div class="tech-label">Fundamentals</div>'
-      + (h.pe ? tr('P/E Ratio', h.pe.toFixed(1)) : '')
+      + (h.pe ? tr('P/E Ratio', h.pe.toFixed(1) + (h.sectorPe ? ' <span style="color:#94a3b8;font-size:10px">(Sector: ' + h.sectorPe.toFixed(1) + ')</span>' : '')) : '')
       + (h.eps ? tr('EPS (TTM)', '₹'+h.eps.toFixed(2)) : '')
       + (function() {
           const v = h.roe || h.netMargin;
@@ -684,12 +690,32 @@ function renderStockCategory() {
   const validCount = stocks.filter(h => { const e = getEntry(h); return e.primary + e.secondary === h.qty; }).length;
   const allValid   = validCount === stocks.length;
 
+  // ETF exchange section
+  const etfs = portfolio.etfs || [];
+  const etfRows = etfs.map(e => {
+    const sym      = sanitize(e.symbol);
+    const exchVal  = (stockCategory[e.symbol] || {}).exchange || 'NSE';
+    const exchSel  = '<select class="sc-exch settings-select" data-sym="' + sym + '" style="font-size:12px;padding:3px 6px">'
+      + '<option value="NSE"' + (exchVal === 'NSE' ? ' selected' : '') + '>NSE</option>'
+      + '<option value="BSE"' + (exchVal === 'BSE' ? ' selected' : '') + '>BSE</option>'
+      + '</select>';
+    return '<tr><td><strong>' + sym + '</strong></td><td style="color:#64748b;text-align:center">' + e.qty + '</td>'
+      + '<td style="text-align:center">' + exchSel + '</td></tr>';
+  }).join('');
+  const etfSection = etfs.length > 0
+    ? '<div style="margin-top:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:8px">ETF Exchange</div>'
+      + '<div style="overflow-x:auto"><table class="settings-table"><thead><tr>'
+      + '<th>ETF</th><th style="text-align:center">QTY</th><th style="text-align:center">EXCHANGE</th>'
+      + '</tr></thead><tbody>' + etfRows + '</tbody></table></div>'
+    : '';
+
   const el = document.getElementById('settings-stock-category');
   if (!el) return;
   el.innerHTML = '<div style="overflow-x:auto">'
     + '<table class="settings-table"><thead><tr>'
     + '<th>STOCK</th><th style="text-align:center">TOTAL QTY</th><th style="text-align:center">PRIMARY</th><th style="text-align:center">SECONDARY</th><th style="text-align:center">EXCHANGE</th><th>STATUS</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + etfSection
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:0 2px">'
     + '<div id="sc-summary"><span style="color:#64748b">'
     + validCount + ' of ' + stocks.length + ' stocks split correctly'

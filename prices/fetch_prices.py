@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Price fetcher using NSE India API + NSE Archives bhav copy.
-- Live price/PE/52wk: NSE quote API
+Price fetcher using NSE India API + NSE Archives bhav copy + Screener.in fundamentals.
+- Live price/PE/52wk/sector PE/market cap: NSE quote API
 - Historical closes for RSI/DMA: NSE Archives daily CSV (cached to data/price_history.json)
+- EPS/ROE/DivYield/BookValue/D/E: Screener.in (cached 24h to data/screener_cache.json)
 Called from Node.js: echo '[{"symbol":...}]' | python3 fetch_prices.py
 """
-import sys, json, time, datetime, os, urllib.request
+import sys, json, time, datetime, os, re, urllib.request
 import requests
 
 # ── NSE API session ────────────────────────────────────────────────────────
@@ -44,8 +45,10 @@ def nse_quote(symbol):
     return r.json()
 
 # ── Historical closes via NSE Archives bhav copy ───────────────────────────
-DATA_DIR     = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data')
-HISTORY_FILE = os.path.join(DATA_DIR, 'price_history.json')
+DATA_DIR      = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data')
+HISTORY_FILE  = os.path.join(DATA_DIR, 'price_history.json')
+SCREENER_FILE = os.path.join(DATA_DIR, 'screener_cache.json')
+SCREENER_TTL  = 86400  # refresh fundamentals once per day
 
 def load_history_cache():
     try:
@@ -87,37 +90,30 @@ def update_history(symbols, needed_days=210):
     cache = load_history_cache()
     today = datetime.date.today()
 
-    # Collect dates we already have (that have at least one of our symbols)
     have_dates = set()
     for d_str, row in cache.items():
         if any(sym in row for sym in symbols):
             have_dates.add(d_str)
 
-    # Walk backwards from yesterday, download missing trading days
     downloads = 0
     current = today - datetime.timedelta(days=1)
     trading_days_found = len(have_dates)
 
     while trading_days_found < needed_days and downloads < 250:
-        if current.weekday() >= 5:  # skip weekends
+        if current.weekday() >= 5:
             current -= datetime.timedelta(days=1)
             continue
-
         d_str = current.isoformat()
         if d_str in have_dates:
             trading_days_found += 1
             current -= datetime.timedelta(days=1)
             continue
-
         closes = fetch_bhav(current, symbols)
         downloads += 1
-
         if closes is not None:
             cache.setdefault(d_str, {}).update(closes)
             if closes:
                 trading_days_found += 1
-        # if None, it's a holiday — skip and don't count
-
         current -= datetime.timedelta(days=1)
 
     if downloads > 0:
@@ -125,15 +121,79 @@ def update_history(symbols, needed_days=210):
     return cache
 
 def get_closes(symbol, cache, days=210):
-    """Return chronological closes for symbol from cache."""
     closes = []
     for d_str in sorted(cache.keys()):
         if symbol in cache[d_str]:
             closes.append(cache[d_str][symbol])
     return closes[-days:]
 
+# ── Screener.in fundamentals (EPS, ROE, DivYield, BookValue, D/E) ─────────
+def load_screener_cache():
+    try:
+        with open(SCREENER_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_screener_cache(cache):
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(SCREENER_FILE, 'w') as f:
+            json.dump(cache, f)
+    except Exception:
+        pass
+
+def _scrape_screener(symbol):
+    """Fetch and parse fundamentals from screener.in. Returns dict or {}."""
+    try:
+        sr = requests.Session()
+        sr.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml',
+            'Accept-Encoding': 'identity',
+            'Referer': 'https://www.screener.in/',
+        })
+        # Find the company URL
+        resp = sr.get('https://www.screener.in/api/company/search/?q=' + symbol, timeout=10)
+        results = resp.json()
+        if not results:
+            return {}
+        company_url = 'https://www.screener.in' + results[0]['url']
+
+        page = sr.get(company_url, timeout=15)
+        text = page.text
+
+        def extract(pat):
+            m = re.search(pat, text, re.DOTALL)
+            try:
+                return round(float(m.group(1).replace(',', '')), 2) if m else None
+            except Exception:
+                return None
+
+        return {
+            'eps':           extract(r'EPS[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
+            'roe':           extract(r'ROE[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
+            'dividendYield': extract(r'Dividend Yield[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
+            'bookValue':     extract(r'Book Value[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
+            'debtEquity':    extract(r'Debt to equity[^<]*</span>\s*<span[^>]*>([\d.,]+)')
+                          or extract(r'Debt / Equity[^<]*</span>\s*<span[^>]*>([\d.,]+)'),
+        }
+    except Exception:
+        return {}
+
+def get_screener_data(symbol, cache):
+    """Return cached screener data, refreshing if stale (>24h)."""
+    entry = cache.get(symbol, {})
+    if entry.get('_ts') and time.time() - entry['_ts'] < SCREENER_TTL:
+        return entry
+    data = _scrape_screener(symbol)
+    if data:
+        data['_ts'] = time.time()
+        cache[symbol] = data
+    return data
+
 # ── Per-symbol fetch ───────────────────────────────────────────────────────
-def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None):
+def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None, sc=None):
     lookup = SYMBOL_OVERRIDE.get(symbol, symbol)
     try:
         d  = nse_quote(lookup)
@@ -156,11 +216,13 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None):
         wk52_high = wh.get('max')
         wk52_low  = wh.get('min')
 
-        pe = None
+        meta = d.get('metadata', {})
+        pe, sector_pe = None, None
         try:
-            pe_raw = d.get('metadata', {}).get('pdSymbolPe')
-            if pe_raw:
-                pe = round(float(pe_raw), 2)
+            if meta.get('pdSymbolPe'):
+                pe = round(float(meta['pdSymbolPe']), 2)
+            if meta.get('pdSectorPe'):
+                sector_pe = round(float(meta['pdSectorPe']), 2)
         except Exception:
             pass
 
@@ -173,11 +235,10 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None):
             pass
 
         closes = get_closes(lookup, history_cache) if history_cache else []
-
-        # Calculate DMA50/DMA200 from cached closes
         dma50  = round(sum(closes[-50:])  / len(closes[-50:]),  2) if len(closes) >= 50  else None
         dma200 = round(sum(closes[-200:]) / len(closes[-200:]), 2) if len(closes) >= 200 else None
 
+        sc = sc or {}
         return {
             'symbol':        symbol,
             'exchange':      'NSE',
@@ -190,15 +251,16 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None):
             'week52Low':     round(float(wk52_low),  2) if wk52_low  else None,
             'marketCap':     market_cap,
             'pe':            pe,
-            'eps':           None,
-            'roe':           None,
+            'sectorPe':      sector_pe,
+            'eps':           sc.get('eps'),
+            'roe':           sc.get('roe'),
             'netMargin':     None,
-            'debtEquity':    None,
+            'debtEquity':    sc.get('debtEquity'),
             'beta':          None,
-            'bookValue':     None,
-            'dividendYield': None,
+            'bookValue':     sc.get('bookValue'),
+            'dividendYield': sc.get('dividendYield'),
             'analystTarget': None,
-            'closes':        closes[-55:],  # last 55 days for RSI (14-period needs ~28+)
+            'closes':        closes[-55:],
         }
     except Exception:
         return None
@@ -209,20 +271,32 @@ if __name__ == '__main__':
         holdings = json.loads(sys.stdin.read())
         init_session()
 
-        # All NSE symbols we need history for
         nse_symbols = set()
         for item in holdings:
-            sym = item['symbol']
-            nse_symbols.add(SYMBOL_OVERRIDE.get(sym, sym))
+            nse_symbols.add(SYMBOL_OVERRIDE.get(item['symbol'], item['symbol']))
 
-        # Update history cache (downloads missing dates, uses cache for known dates)
         print('[prices/stocks] Updating historical price cache...', file=sys.stderr)
         history_cache = update_history(nse_symbols, needed_days=210)
+
+        # Load screener cache and refresh stale entries
+        screener_cache = load_screener_cache()
+        screener_map   = {}
+        for item in holdings:
+            sym = item['symbol']
+            sc_data = get_screener_data(sym, screener_cache)
+            screener_map[sym] = sc_data
+        save_screener_cache(screener_cache)
 
         results = {}
         for item in holdings:
             symbol = item['symbol']
-            result = fetch(symbol, item.get('avgCost'), item.get('exchange'), history_cache)
+            result = fetch(
+                symbol,
+                item.get('avgCost'),
+                item.get('exchange'),
+                history_cache,
+                screener_map.get(symbol, {}),
+            )
             results[symbol] = result
             time.sleep(0.3)
 

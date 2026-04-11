@@ -438,11 +438,16 @@ app.get('/api/stock-category', (req, res) => {
 
 app.post('/api/stock-category', (req, res) => {
   const data = db.read();
-  const validSymbols = new Set((data.stocks || []).map(s => s.symbol));
+  const validSymbols = new Set([
+    ...(data.stocks || []).map(s => s.symbol),
+    ...(data.etfs   || []).map(e => e.symbol),
+  ]);
   const filtered = {};
   for (const [sym, val] of Object.entries(req.body || {})) {
     if (validSymbols.has(sym) && typeof val.primary === 'number' && typeof val.secondary === 'number') {
-      filtered[sym] = { primary: val.primary, secondary: val.secondary, exchange: val.exchange || 'NSE' };
+      filtered[sym] = { primary: val.primary ?? undefined, secondary: val.secondary ?? undefined, exchange: val.exchange || 'NSE' };
+      if (filtered[sym].primary === undefined) delete filtered[sym].primary;
+      if (filtered[sym].secondary === undefined) delete filtered[sym].secondary;
     }
   }
   fs.writeFileSync(STOCK_CATEGORY_PATH, JSON.stringify(filtered, null, 2));
