@@ -103,7 +103,9 @@ async function refreshPrices(holdings) {
       dividendYield:  data.dividendYield || null,
       analystTarget:  data.analystTarget || null,
       rsi,
-      trend: data.dma50 ? (ltp > data.dma50 ? 'Bullish' : 'Bearish') : null,
+      trend:     data.dma50 ? (ltp > data.dma50 ? 'Bullish' : 'Bearish') : null,
+      volume:    data.volume    || null,
+      avgVolume: data.avgVolume || null,
       health,
     };
   });

@@ -76,10 +76,13 @@ def fetch_bhav(date, symbols):
         result = {}
         for line in content.split('\n')[1:]:
             parts = [p.strip() for p in line.split(',')]
-            if len(parts) >= 9 and parts[0] in symbols and parts[1] == 'EQ':
+            if len(parts) >= 11 and parts[0] in symbols and parts[1] == 'EQ':
                 try:
-                    result[parts[0]] = float(parts[8])  # CLOSE_PRICE column
-                except ValueError:
+                    result[parts[0]] = {
+                        'c': float(parts[8]),   # CLOSE_PRICE
+                        'v': int(float(parts[10])),  # TTL_TRD_QNTY (volume)
+                    }
+                except (ValueError, IndexError):
                     pass
         return result
     except Exception:
@@ -108,11 +111,11 @@ def update_history(symbols, needed_days=210):
             trading_days_found += 1
             current -= datetime.timedelta(days=1)
             continue
-        closes = fetch_bhav(current, symbols)
+        day_data = fetch_bhav(current, symbols)
         downloads += 1
-        if closes is not None:
-            cache.setdefault(d_str, {}).update(closes)
-            if closes:
+        if day_data is not None:
+            cache.setdefault(d_str, {}).update(day_data)
+            if day_data:
                 trading_days_found += 1
         current -= datetime.timedelta(days=1)
 
@@ -121,11 +124,23 @@ def update_history(symbols, needed_days=210):
     return cache
 
 def get_closes(symbol, cache, days=210):
+    """Extract chronological closes. Handles both old (float) and new ({c,v}) cache format."""
     closes = []
     for d_str in sorted(cache.keys()):
-        if symbol in cache[d_str]:
-            closes.append(cache[d_str][symbol])
+        entry = cache[d_str].get(symbol)
+        if entry is None:
+            continue
+        closes.append(entry['c'] if isinstance(entry, dict) else float(entry))
     return closes[-days:]
+
+def get_volumes(symbol, cache, days=30):
+    """Extract recent trading volumes."""
+    vols = []
+    for d_str in sorted(cache.keys()):
+        entry = cache[d_str].get(symbol)
+        if isinstance(entry, dict) and 'v' in entry:
+            vols.append(entry['v'])
+    return vols[-days:]
 
 # ── Screener.in fundamentals (EPS, ROE, DivYield, BookValue, D/E) ─────────
 def load_screener_cache():
@@ -239,14 +254,20 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None, sc=No
         except Exception:
             pass
 
-        closes = get_closes(lookup, history_cache) if history_cache else []
-        dma50  = round(sum(closes[-50:])  / len(closes[-50:]),  2) if len(closes) >= 50  else None
-        dma200 = round(sum(closes[-200:]) / len(closes[-200:]), 2) if len(closes) >= 200 else None
+        closes  = get_closes(lookup, history_cache)  if history_cache else []
+        volumes = get_volumes(lookup, history_cache) if history_cache else []
+        dma50   = round(sum(closes[-50:])  / len(closes[-50:]),  2) if len(closes) >= 50  else None
+        dma200  = round(sum(closes[-200:]) / len(closes[-200:]), 2) if len(closes) >= 200 else None
+
+        # Average volume (20-day)
+        avg_vol = int(sum(volumes[-20:]) / len(volumes[-20:])) if len(volumes) >= 5 else None
+        # Today's volume vs average (from NSE priceInfo if available - bhav has yesterday's)
+        volume  = volumes[-1] if volumes else None
 
         sc = sc or {}
         return {
             'symbol':        symbol,
-            'exchange':      'NSE',
+            'exchange':      stored_exchange or 'NSE',
             'ticker':        lookup + '.NS',
             'price':         price,
             'prevClose':     prev_close,
@@ -267,6 +288,8 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None, sc=No
             'dividendYield': sc.get('dividendYield'),
             'analystTarget': None,
             'closes':        closes[-55:],
+            'volume':        volume,
+            'avgVolume':     avg_vol,
         }
     except Exception:
         return None

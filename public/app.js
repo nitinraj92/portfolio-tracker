@@ -341,6 +341,16 @@ function renderStocks() {
       + (h.dma200 ? '<div class="tech-row"><span>vs 200 DMA</span><span class="' + ((h.ltp||0)>h.dma200?'val-green':'val-red') + '">' + ((h.ltp||0)>h.dma200 ? 'Above ₹'+Math.round(h.dma200).toLocaleString('en-IN')+' ▲' : 'Below ₹'+Math.round(h.dma200).toLocaleString('en-IN')+' ▼') + '</span></div>' : '')
       + (h.trend ? trc('Trend', sanitize(h.trend), h.trend==='Bullish'?'val-green':'val-red') : '')
       + (h.week52Low ? tr('52W Range', '₹'+Math.round(h.week52Low).toLocaleString('en-IN')+'–₹'+Math.round(h.week52High).toLocaleString('en-IN')) : '')
+      + (function() {
+          if (!h.volume) return '';
+          const v = h.volume.toLocaleString('en-IN');
+          const avg = h.avgVolume;
+          if (!avg) return tr('Volume', v);
+          const ratio = h.volume / avg;
+          const cls = ratio > 1.5 ? 'val-green' : ratio < 0.5 ? 'val-red' : '';
+          const label = ratio > 1.5 ? ' ▲ high' : ratio < 0.5 ? ' ▼ low' : '';
+          return '<div class="tech-row"><span>Volume</span><span class="' + cls + '">' + v + '<span style="font-size:10px;margin-left:4px">' + label + ' (avg ' + avg.toLocaleString('en-IN') + ')</span></span></div>';
+        })()
       + '</div>'
       + '<div class="tech-section"><div class="tech-label">Fundamentals</div>'
       + (h.pe ? tr('P/E Ratio', h.pe.toFixed(1) + (h.sectorPe ? ' <span style="color:#94a3b8;font-size:10px">(Sector: ' + h.sectorPe.toFixed(1) + ')</span>' : '')) : '')
