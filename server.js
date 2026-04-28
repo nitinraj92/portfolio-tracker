@@ -120,11 +120,12 @@ function isMarketOpen() {
 }
 
 function calcPortfolioSummary(data) {
-  const { stocks = [], etfs = [], mf_nitin = [], mf_indumati = [], sips = {}, assumptions = {}, realized_pnl = {} } = data;
+  const { stocks = [], stocks_secondary = [], etfs = [], mf_nitin = [], mf_indumati = [], sips = {}, assumptions = {}, realized_pnl = {} } = data;
+  const allStocks = [...stocks, ...stocks_secondary];
 
-  const stocksInv   = stocks.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
-  const stocksVal   = stocks.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
-  const stocksToday = stocks.reduce((s, h) => s + (h.todayPL || 0), 0);
+  const stocksInv   = allStocks.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
+  const stocksVal   = allStocks.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
+  const stocksToday = allStocks.reduce((s, h) => s + (h.todayPL || 0), 0);
 
   const etfsInv   = etfs.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
   const etfsVal   = etfs.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
@@ -240,6 +241,8 @@ app.post('/api/upload/zerodha', upload.single('file'), (req, res) => {
     const data = db.read();
     const prevICICIEtfs = data.etfs.filter(e => e.source === 'icici');
     data.stocks = stocks;
+    // Preserve secondary account data — only primary is replaced
+    if (!data.stocks_secondary) data.stocks_secondary = [];
     data.etfs = [...prevICICIEtfs, ...zEtfs];
     if (!data.source_metadata) data.source_metadata = {};
     data.source_metadata.zerodha = meta;
@@ -247,7 +250,25 @@ app.post('/api/upload/zerodha', upload.single('file'), (req, res) => {
     db.setTimestamp('zerodha');
     const diff = { stocks: { updated: stocks.length }, etfs: { updated: zEtfs.length } };
     db.addUploadHistory({ source: 'zerodha', filename: req.file.originalname, changes: diff });
-    // File already saved to data_sources/ by multer — no unlink needed
+    res.json({ success: true, diff, meta });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/upload/zerodha-secondary', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  try {
+    const { stocks } = parseZerodha(req.file.path);
+    const meta = extractFileMetadata(req.file.path, 'zerodha');
+    const data = db.read();
+    data.stocks_secondary = stocks.map(s => ({ ...s, source: 'zerodha_secondary' }));
+    if (!data.source_metadata) data.source_metadata = {};
+    data.source_metadata.zerodha_secondary = meta;
+    db.write(data);
+    db.setTimestamp('zerodha_secondary');
+    const diff = { stocks: { updated: stocks.length } };
+    db.addUploadHistory({ source: 'zerodha_secondary', filename: req.file.originalname, changes: diff });
     res.json({ success: true, diff, meta });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -433,8 +454,9 @@ app.get('/api/stock-category', (req, res) => {
 app.post('/api/stock-category', (req, res) => {
   const data = db.read();
   const validSymbols = new Set([
-    ...(data.stocks || []).map(s => s.symbol),
-    ...(data.etfs   || []).map(e => e.symbol),
+    ...(data.stocks           || []).map(s => s.symbol),
+    ...(data.stocks_secondary || []).map(s => s.symbol),
+    ...(data.etfs             || []).map(e => e.symbol),
   ]);
   const filtered = {};
   const etfSymbols = new Set((data.etfs || []).map(e => e.symbol));
@@ -518,9 +540,14 @@ app.get('/api/export', (req, res) => {
 
   const r = n => Math.round((n || 0) * 100) / 100;
 
-  // Sheet 1: Stocks
-  const stockRows = data.stocks.map(h => ({
+  // Sheet 1: Stocks (primary + secondary combined)
+  const allExportStocks = [
+    ...(data.stocks           || []).map(h => ({ ...h, _account: 'Primary' })),
+    ...(data.stocks_secondary || []).map(h => ({ ...h, _account: 'Secondary' })),
+  ];
+  const stockRows = allExportStocks.map(h => ({
     Symbol: h.symbol,
+    Account: h._account,
     Sector: h.sector || '',
     Qty: h.qty,
     'Avg Cost': r(h.avgCost),
@@ -533,14 +560,14 @@ app.get('/api/export', (req, res) => {
     RSI: h.rsi || '',
     Health: h.health || '',
   }));
-  const stocksInv = data.stocks.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
-  const stocksVal = data.stocks.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
+  const stocksInv = allExportStocks.reduce((s, h) => s + (h.avgCost || 0) * h.qty, 0);
+  const stocksVal = allExportStocks.reduce((s, h) => s + (h.ltp || 0) * h.qty, 0);
   stockRows.push({
-    Symbol: 'TOTAL', Sector: '', Qty: '', 'Avg Cost': '',
+    Symbol: 'TOTAL', Account: '', Sector: '', Qty: '', 'Avg Cost': '',
     LTP: '', 'Invested (₹)': r(stocksInv), 'Value (₹)': r(stocksVal),
     'P&L (₹)': r(stocksVal - stocksInv),
     'P&L %': stocksInv > 0 ? r((stocksVal - stocksInv) / stocksInv * 100) : 0,
-    "Today P&L (₹)": r(data.stocks.reduce((s, h) => s + (h.todayPL || 0), 0)),
+    "Today P&L (₹)": r(allExportStocks.reduce((s, h) => s + (h.todayPL || 0), 0)),
     RSI: '', Health: '',
   });
 
@@ -616,12 +643,13 @@ app.get('/api/export', (req, res) => {
 app.post('/api/flush', (req, res) => {
   const data = db.read();
   data.stocks = [];
+  data.stocks_secondary = [];
   data.etfs = [];
   data.mf_nitin = [];
   data.mf_indumati = [];
   data.price_history_cache = {};
   data.upload_history = [];
-  data.lastUpdated = { zerodha: null, icici: null, mfcentral_nitin: null, mfcentral_indumati: null, prices: null };
+  data.lastUpdated = { zerodha: null, zerodha_secondary: null, icici: null, mfcentral_nitin: null, mfcentral_indumati: null, prices: null };
   // Keep: sips, assumptions, mf_scheme_codes
   db.write(data);
   res.json({ success: true, message: 'All holdings cleared. SIPs and assumptions preserved.' });
@@ -646,12 +674,21 @@ function applyPrices(holding, map) {
 async function doStockEtfRefresh() {
   try {
     const snapshot = db.read();
-    const updatedStocks = await refreshPrices(applyExchangeOverrides(snapshot.stocks));
+    const primaryStocks    = snapshot.stocks           || [];
+    const secondaryStocks  = snapshot.stocks_secondary || [];
+    // Fetch prices for all unique symbols (primary + any secondary-only symbols)
+    const primarySymbols   = new Set(primaryStocks.map(s => s.symbol));
+    const secondaryOnly    = secondaryStocks.filter(s => !primarySymbols.has(s.symbol));
+    const allStocksForFetch = [...primaryStocks, ...secondaryOnly];
+    const updatedStocks = await refreshPrices(applyExchangeOverrides(allStocksForFetch));
     const updatedEtfs   = await refreshPrices(applyExchangeOverrides(snapshot.etfs));
     const data = db.read();
     const stockMap = Object.fromEntries(updatedStocks.map(s => [s.symbol, s]));
     const etfMap   = Object.fromEntries(updatedEtfs.map(e => [e.symbol, e]));
     data.stocks = data.stocks.map(s => applyPrices(s, stockMap));
+    if (data.stocks_secondary && data.stocks_secondary.length > 0) {
+      data.stocks_secondary = data.stocks_secondary.map(s => applyPrices(s, stockMap));
+    }
     data.etfs   = data.etfs.map(e => applyPrices(e, etfMap));
     data.lastUpdated.prices = new Date().toISOString();
     db.write(data);

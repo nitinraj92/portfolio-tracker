@@ -40,9 +40,30 @@ async function loadStockCategory() {
   stockCategory = await api('GET', '/api/stock-category');
 }
 
+function combineStocksWithSecondary(primary, secondary) {
+  const map = {};
+  (primary || []).forEach(s => {
+    map[s.symbol] = { ...s, _srcPrimary: s.qty, _srcSecondary: 0 };
+  });
+  (secondary || []).forEach(s => {
+    if (map[s.symbol]) {
+      const p = map[s.symbol];
+      const totalQty = p._srcPrimary + s.qty;
+      const pInv = p._srcPrimary * (p.avgCost || 0);
+      const sInv = s.qty * (s.avgCost || 0);
+      p._srcSecondary = s.qty;
+      p.qty = totalQty;
+      p.avgCost = totalQty > 0 ? Math.round((pInv + sInv) / totalQty * 100) / 100 : 0;
+    } else {
+      map[s.symbol] = { ...s, _srcPrimary: 0, _srcSecondary: s.qty };
+    }
+  });
+  return Object.values(map);
+}
+
 async function saveStockCategory() {
   if (!portfolio) return;
-  const stocks = portfolio.stocks || [];
+  const stocks = combineStocksWithSecondary(portfolio.stocks, portfolio.stocks_secondary);
   const etfs   = portfolio.etfs   || [];
   const newCategory = {};
   stocks.forEach(h => {
@@ -278,10 +299,15 @@ function startCountdown() {
 // ── Stocks Tab ──────────────────────────────────────────────────────────
 function renderStocks() {
   if (!portfolio) return;
-  const stocks = portfolio.stocks || [];
+  const stocks = combineStocksWithSecondary(portfolio.stocks, portfolio.stocks_secondary);
 
   function getAccountQtys(h) {
-    return stockCategory[h.symbol] || { primary: h.qty, secondary: 0 };
+    if (stockCategory[h.symbol]) return stockCategory[h.symbol];
+    // Auto-derive from source upload data
+    if (h._srcPrimary !== undefined || h._srcSecondary !== undefined) {
+      return { primary: h._srcPrimary || 0, secondary: h._srcSecondary || 0 };
+    }
+    return { primary: h.qty, secondary: 0 };
   }
 
   function withCalcs(h) {
@@ -663,7 +689,7 @@ function renderMF() {
 
 function updateStockCategoryValidation() {
   if (!portfolio) return;
-  const stocks = portfolio.stocks || [];
+  const stocks = combineStocksWithSecondary(portfolio.stocks, portfolio.stocks_secondary);
   let allValid = true;
   let validCount = 0;
   stocks.forEach(h => {
@@ -696,10 +722,15 @@ function updateStockCategoryValidation() {
 
 function renderStockCategory() {
   if (!portfolio) return;
-  const stocks = portfolio.stocks || [];
+  const stocks = combineStocksWithSecondary(portfolio.stocks, portfolio.stocks_secondary);
 
   function getEntry(h) {
-    return stockCategory[h.symbol] || { primary: h.qty, secondary: 0 };
+    if (stockCategory[h.symbol]) return stockCategory[h.symbol];
+    return {
+      primary:   h._srcPrimary   !== undefined ? h._srcPrimary   : h.qty,
+      secondary: h._srcSecondary !== undefined ? h._srcSecondary : 0,
+      exchange:  'NSE',
+    };
   }
 
   const inputStyle = 'width:65px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:center';
@@ -768,9 +799,10 @@ function renderStockCategory() {
 // ── Data Sources Tab ──────────────────────────────────────────────────────
 // SOURCE_CONFIG split into two groups for display
 const SOURCE_STOCKS_ETFS = [
-  { id:'zerodha',      title:'Zerodha — Holdings',   iconLabel:'Z',   iconCls:'zerodha', endpoint:'/api/upload/zerodha',       accept:'.xlsx',      hint:'Console → Reports → Holdings → Export XLSX · Upload format: <strong>XLSX</strong>' },
-  { id:'icici',        title:'ICICI Direct',         iconLabel:'IC',  iconCls:'icici',   endpoint:'/api/upload/icici',         accept:'.csv',       hint:'Portfolio → Portfolio Summary → Export · Upload format: <strong>CSV</strong>' },
-  { id:'realized_pnl', title:'Zerodha — Realized P&L', iconLabel:'P&L', iconCls:'zerodha', endpoint:'/api/upload/realized-pnl', accept:'.xlsx',      hint:'Console → Reports → Tax P&L → Download XLSX · Multiple files merge automatically · Upload format: <strong>XLSX</strong>' },
+  { id:'zerodha',           title:'Zerodha — Primary Holdings',   iconLabel:'Z1',  iconCls:'zerodha', endpoint:'/api/upload/zerodha',           accept:'.xlsx', hint:'Primary Zerodha account · Console → Reports → Holdings → Export XLSX · Upload format: <strong>XLSX</strong>' },
+  { id:'zerodha_secondary', title:'Zerodha — Secondary Holdings', iconLabel:'Z2',  iconCls:'zerodha', endpoint:'/api/upload/zerodha-secondary', accept:'.xlsx', hint:'Secondary Zerodha account · Console → Reports → Holdings → Export XLSX · Upload format: <strong>XLSX</strong>' },
+  { id:'icici',             title:'ICICI Direct',                 iconLabel:'IC',  iconCls:'icici',   endpoint:'/api/upload/icici',             accept:'.csv',  hint:'Portfolio → Portfolio Summary → Export · Upload format: <strong>CSV</strong>' },
+  { id:'realized_pnl',      title:'Zerodha — Realized P&L',      iconLabel:'P&L', iconCls:'zerodha', endpoint:'/api/upload/realized-pnl',      accept:'.xlsx', hint:'Console → Reports → Tax P&L → Download XLSX · Multiple files merge automatically · Upload format: <strong>XLSX</strong>' },
 ];
 const SOURCE_MF = [
   { id:'mfcentral_nitin',    title:'MFCentral — Nitin',    iconLabel:'MF', iconCls:'nitin', endpoint:'/api/upload/mfcentral', accept:'.csv,.xlsx', hint:'mfcentral.in → CAS → Detailed → Download · Upload format: <strong>XLSX or CSV</strong>' },
