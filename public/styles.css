@@ -54,9 +54,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .segment-item { flex: 1; text-align: center; padding: 6px 8px; font-size: 11px; border-right: 1px solid var(--header-light); color: var(--text-muted); }
 .segment-item:last-child { border-right: none; }
 .seg-name { color: var(--text-muted); font-size: 10px; }
+.seg-alloc { color: var(--text-dim); font-size: 9px; font-weight: 400; }
 .seg-pl { font-weight: 600; font-size: 11px; }
 .seg-today { font-size: 10px; color: var(--text-dim); }
 .seg-xirr { font-size: 10px; color: var(--text-dim); }
+.mobile-prices-row { display: none; }
 
 /* Tab nav */
 .tab-nav { background: white; display: flex; border-bottom: 2px solid var(--border); padding: 0 20px; overflow-x: auto; }
@@ -271,7 +273,7 @@ input[type="file"].hidden { display: none; }
 /* ── Mobile Responsive (max 768px) ──────────────────────────────────── */
 @media (max-width: 768px) {
 
-  /* Header top: hide countdown, compact layout */
+  /* Header top: hide countdown (shown in mobile-prices-row instead), compact layout */
   .header-top { padding: 8px 12px; }
   .app-title { font-size: 13px; }
   .refresh-info { display: none; }
@@ -290,11 +292,15 @@ input[type="file"].hidden { display: none; }
   .cards-row-1 { border-bottom: 1px solid var(--header-light); }
   .allocation-bars { display: none; }
 
-  /* Segment strip: 2x2 grid */
+  /* Segment strip: 2-col grid (5th item spans full width) */
   .segment-strip { display: grid; grid-template-columns: 1fr 1fr; }
   .segment-item { border-right: none; border-bottom: 1px solid var(--header-light); padding: 5px 8px; }
+  #seg-nifty { grid-column: 1 / -1; border-bottom: none; }
   .seg-pl { font-size: 11px; }
   .seg-today, .seg-xirr { font-size: 10px; }
+
+  /* Mobile prices-last-updated bar */
+  .mobile-prices-row { display: flex; align-items: center; justify-content: center; background: var(--header-dark); border-top: 1px solid var(--header-light); padding: 4px 12px; font-size: 10px; color: var(--text-dim); gap: 8px; }
 
   /* Tab nav: horizontally scrollable, smaller text */
   .tab-nav { padding: 0 4px; gap: 0; }

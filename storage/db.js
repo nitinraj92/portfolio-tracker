@@ -9,6 +9,7 @@ const DEFAULT = {
   realized_pnl: { entries: [], totalRealizedPL: 0, totalBuyValue: 0, totalSellValue: 0, winners: 0, losers: 0 },
   source_metadata: { zerodha: null, zerodha_secondary: null, icici: null, mfcentral_nitin: null, mfcentral_indumati: null, realized_pnl: null },
   stocks: [], stocks_secondary: [], etfs: [], mf_nitin: [], mf_indumati: [],
+  nifty50: null,
   mf_scheme_codes: {}, price_history_cache: {}, upload_history: [],
   sips: { mf: [], etf_zerodha: [], etf_icici: [] },
   assumptions: { mfEtfCagr: 12, stocksCagr: 15, monthlyStockBudget: 4000 }

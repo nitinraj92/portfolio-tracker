@@ -295,6 +295,23 @@ def fetch(symbol, avg_cost=None, stored_exchange=None, history_cache=None, sc=No
         return None
 
 
+def fetch_nifty50():
+    """Fetch Nifty 50 index data from NSE allIndices endpoint."""
+    try:
+        r = SESSION.get('https://www.nseindia.com/api/allIndices', timeout=15)
+        r.raise_for_status()
+        for idx in r.json().get('data', []):
+            if idx.get('indexSymbol') == 'NIFTY 50':
+                price = round(float(idx.get('last', 0)), 2)
+                prev  = round(float(idx.get('previousClose', 0) or idx.get('last', 0)), 2)
+                chg   = round(float(idx.get('change', 0)), 2)
+                pct   = round(float(idx.get('percentChange', 0)), 2)
+                return {'price': price, 'prevClose': prev, 'change': chg, 'changePct': pct}
+    except Exception:
+        pass
+    return None
+
+
 if __name__ == '__main__':
     try:
         holdings = json.loads(sys.stdin.read())
@@ -328,6 +345,11 @@ if __name__ == '__main__':
             )
             results[symbol] = result
             time.sleep(0.3)
+
+        # Append Nifty 50 index data
+        nifty = fetch_nifty50()
+        if nifty:
+            results['__NIFTY50__'] = nifty
 
         print(json.dumps(results))
     except Exception as e:

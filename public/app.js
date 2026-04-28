@@ -190,12 +190,17 @@ function renderDashboard() {
 
   document.getElementById('total-invested').textContent = 'Invested: ' + fmt(summary.totalInvested);
 
-  // Unrealized P&L
+  // Unrealized P&L — value + % on same line, Today as sub-line
   const plEl = document.getElementById('total-pl');
   const upl = summary.unrealizedPL || 0;
-  plEl.textContent = sign(upl) + fmt(upl);
+  plEl.textContent = sign(upl) + fmt(upl) + ' (' + fmtPct(summary.unrealizedPLPct || 0) + ')';
   plEl.className = 'card-value ' + plCls(upl);
-  document.getElementById('total-pl-pct').textContent = '(' + fmtPct(summary.unrealizedPLPct || 0) + ')';
+  const plTodayEl = document.getElementById('total-pl-today');
+  if (plTodayEl) {
+    const tdpl = summary.totalTodayPL || 0;
+    plTodayEl.textContent = 'Today: ' + sign(tdpl) + fmt(tdpl);
+    plTodayEl.style.color = tdpl >= 0 ? 'var(--green)' : 'var(--red)';
+  }
 
   // Total P&L (combined card: value + % + today as sub-line)
   const gtEl = document.getElementById('grand-total-pl');
@@ -245,24 +250,45 @@ function renderDashboard() {
   }).join('');
 
   const segDefs = [
-    { id: 'seg-stocks',   name: 'Stocks',        seg: segs.stocks },
-    { id: 'seg-etfs',     name: 'ETFs',           seg: segs.etfs },
-    { id: 'seg-mf-nitin', name: 'MF — Nitin',     seg: segs.mf_nitin },
-    { id: 'seg-mf-indu',  name: 'MF — Indumati',  seg: segs.mf_indumati },
+    { id: 'seg-stocks',   name: 'Stocks',       seg: segs.stocks },
+    { id: 'seg-etfs',     name: 'ETFs',          seg: segs.etfs },
+    { id: 'seg-mf-nitin', name: 'MF — Nitin',    seg: segs.mf_nitin },
+    { id: 'seg-mf-indu',  name: 'MF — Indumati', seg: segs.mf_indumati },
   ];
   segDefs.forEach(({ id, name, seg }) => {
     const el = document.getElementById(id);
     if (!el || !seg) return;
-    const plPct = seg.invested ? (seg.pl / seg.invested * 100) : 0;
-
-    const extraLines = '';
-
-    el.innerHTML = '<div class="seg-name">' + sanitize(name) + '</div>'
+    const plPct    = seg.invested ? (seg.pl / seg.invested * 100) : 0;
+    const allocPct = sanitize(((seg.value || 0) / total * 100).toFixed(1));
+    el.innerHTML = '<div class="seg-name">' + sanitize(name) + ' <span class="seg-alloc">' + allocPct + '%</span></div>'
       + '<div class="seg-pl ' + plCls(seg.pl) + '">' + sign(seg.pl) + fmt(seg.pl) + ' (' + fmtPct(plPct) + ')</div>'
       + '<div class="seg-today ' + plCls(seg.todayPL) + '">Today: ' + sign(seg.todayPL) + fmt(seg.todayPL) + '</div>'
-      + extraLines
-      + (seg.xirr != null ? '<div class="seg-xirr">XIRR ' + seg.xirr.toFixed(1) + '%</div>' : '');
+      + (seg.xirr != null ? '<div class="seg-xirr">XIRR ' + sanitize(seg.xirr.toFixed(1)) + '%</div>' : '');
   });
+
+  // Nifty 50 segment item
+  const niftyEl = document.getElementById('seg-nifty');
+  if (niftyEl) {
+    const n = portfolio.nifty50;
+    if (n && n.price) {
+      const pct      = Number(n.changePct || 0);
+      const priceStr = sanitize(Math.round(n.price).toLocaleString('en-IN'));
+      const pctStr   = sanitize((pct >= 0 ? '+' : '') + pct.toFixed(2) + '%');
+      niftyEl.innerHTML = '<div class="seg-name">Nifty 50</div>'
+        + '<div class="seg-pl">' + priceStr + '</div>'
+        + '<div class="seg-today ' + plCls(pct) + '">Today: ' + pctStr + '</div>';
+    } else {
+      niftyEl.innerHTML = '<div class="seg-name">Nifty 50</div>'
+        + '<div class="seg-today">— refresh to load</div>';
+    }
+  }
+
+  // Mobile prices-last-updated bar (shown via CSS only on ≤768px)
+  const mpr = document.getElementById('mobile-prices-row');
+  if (mpr) {
+    const ago = fmtAgo(lastUpdated?.prices);
+    mpr.textContent = ago ? ('🕐 Prices: ' + ago + (portfolio.marketOpen ? ' · auto 30m' : '')) : '';
+  }
 
   luBadge(lastUpdated?.zerodha, 'lu-zerodha');
   luBadge(lastUpdated?.zerodha, 'lu-zerodha-etf');
