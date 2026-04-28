@@ -690,7 +690,8 @@ async function doStockEtfRefresh() {
       data.stocks_secondary = data.stocks_secondary.map(s => applyPrices(s, stockMap));
     }
     data.etfs   = data.etfs.map(e => applyPrices(e, etfMap));
-    if (stockMap['__NIFTY50__']) data.nifty50 = stockMap['__NIFTY50__'];
+    const niftyRaw = updatedStocks._extras && updatedStocks._extras['__NIFTY50__'];
+    if (niftyRaw) data.nifty50 = niftyRaw;
     data.lastUpdated.prices = new Date().toISOString();
     db.write(data);
     console.log('[server] Stock/ETF refresh done');

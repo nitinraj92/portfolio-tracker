@@ -47,7 +47,7 @@ async function refreshPrices(holdings) {
   console.log('[prices/stocks] Fetching', holdings.length, 'symbols via Python yfinance...');
   const priceMap = await fetchPricesBatch(holdings);
 
-  return holdings.map(holding => {
+  const result = holdings.map(holding => {
     const data = priceMap[holding.symbol];
     if (!data || !data.price) {
       console.warn('[prices/stocks] No data for', holding.symbol, '— keeping existing');
@@ -109,6 +109,8 @@ async function refreshPrices(holdings) {
       health,
     };
   });
+  result._extras = priceMap;
+  return result;
 }
 
 /**

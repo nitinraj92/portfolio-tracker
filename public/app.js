@@ -197,12 +197,14 @@ function renderDashboard() {
   plEl.className = 'card-value ' + plCls(upl);
   const plTodayEl = document.getElementById('total-pl-today');
   if (plTodayEl) {
-    const tdpl = summary.totalTodayPL || 0;
-    plTodayEl.textContent = 'Today: ' + sign(tdpl) + fmt(tdpl);
+    const tdpl    = summary.totalTodayPL || 0;
+    const prevVal = (summary.totalValue || 1) - tdpl;
+    const todayPct = prevVal !== 0 ? ((tdpl / prevVal) * 100).toFixed(2) : '0.00';
+    plTodayEl.textContent = 'Today: ' + sign(tdpl) + fmt(tdpl) + ' (' + (tdpl >= 0 ? '+' : '') + todayPct + '%)';
     plTodayEl.style.color = tdpl >= 0 ? 'var(--green)' : 'var(--red)';
   }
 
-  // Total P&L (combined card: value + % + today as sub-line)
+  // Total P&L card — value + % only, no Today sub-line
   const gtEl = document.getElementById('grand-total-pl');
   if (gtEl) {
     const gpl = summary.grandTotalPL || 0;
@@ -211,11 +213,7 @@ function renderDashboard() {
     const gtPct = document.getElementById('grand-total-pl-pct');
     if (gtPct) gtPct.textContent = '';
     const todaySub = document.getElementById('today-pl-sub');
-    if (todaySub) {
-      const tdpl = summary.totalTodayPL || 0;
-      todaySub.textContent = 'Today: ' + sign(tdpl) + fmt(tdpl);
-      todaySub.style.color = tdpl >= 0 ? 'var(--green)' : 'var(--red)';
-    }
+    if (todaySub) todaySub.textContent = '';
   }
 
   document.getElementById('monthly-sips').textContent = fmt(summary.monthlySIPs);
