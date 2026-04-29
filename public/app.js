@@ -256,11 +256,14 @@ function renderDashboard() {
   segDefs.forEach(({ id, name, seg }) => {
     const el = document.getElementById(id);
     if (!el || !seg) return;
-    const plPct    = seg.invested ? (seg.pl / seg.invested * 100) : 0;
-    const allocPct = sanitize(((seg.value || 0) / total * 100).toFixed(1));
+    const plPct      = seg.invested ? (seg.pl / seg.invested * 100) : 0;
+    const allocPct   = sanitize(((seg.value || 0) / total * 100).toFixed(1));
+    const prevSegVal = (seg.value || 0) - (seg.todayPL || 0);
+    const todayPct   = prevSegVal !== 0 ? ((seg.todayPL || 0) / prevSegVal * 100).toFixed(2) : '0.00';
+    const todayPctStr = sanitize((seg.todayPL >= 0 ? '+' : '') + todayPct + '%');
     el.innerHTML = '<div class="seg-name">' + sanitize(name) + ' <span class="seg-alloc">' + allocPct + '%</span></div>'
       + '<div class="seg-pl ' + plCls(seg.pl) + '">' + sign(seg.pl) + fmt(seg.pl) + ' (' + fmtPct(plPct) + ')</div>'
-      + '<div class="seg-today ' + plCls(seg.todayPL) + '">Today: ' + sign(seg.todayPL) + fmt(seg.todayPL) + '</div>'
+      + '<div class="seg-today ' + plCls(seg.todayPL) + '">Today: ' + sign(seg.todayPL) + fmt(seg.todayPL) + ' (' + todayPctStr + ')</div>'
       + (seg.xirr != null ? '<div class="seg-xirr">XIRR ' + sanitize(seg.xirr.toFixed(1)) + '%</div>' : '');
   });
 
